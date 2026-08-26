@@ -28,10 +28,15 @@ default_state = {
     "name_z_neg": "Magenta", "hex_z_neg": "#FF00FF",
     "show_abyss": True, "name_abyss": "Indigo Abyss", "hex_abyss": "#080414",
     "show_core": True, "name_core": "Violet Core", "hex_core": "#59268C",
-    "show_heat": True, "name_heat": "Orange Heat", "hex_heat": "#FF6600",
+    "show_heat": True, "name_heat": "Orange Undercrust", "hex_heat": "#FF6600",
     "show_luma": True, "name_luma": "White Luma", "hex_luma": "#F2F2F2",
     "show_crust": True, "name_crust": "Umber Crust", "hex_crust": "#26140D",
-    "show_grid": False, "sun_intensity": 0.8, "shadow_depth": 0.3, "brilliance": 1.4, "rot_x": 0, "rot_y": 0
+    "show_grid": False, "brilliance": 1.4, "rot_x": 0, "rot_y": 0,
+    "rad_abyss": 0.1, "fade_abyss": 0.5,
+    "rad_core": 0.5, "fade_core": 0.7,
+    "rad_luma": 1.2, "fade_luma": 0.4,
+    "rad_heat": 1.5, "fade_heat": 0.3,
+    "rad_crust": 1.8, "fade_crust": 0.2
 }
 
 for k, v in default_state.items():
@@ -55,7 +60,7 @@ with st.sidebar:
         **The 6+4 Minimalist Palette**
         You can achieve a staggering gamut of color with just 6 to 10 specific pigments:
         * **The 6 Anchors:** Red, Green, Blue (RGB) and Cyan, Magenta, Yellow (CMY). 
-        * **The Atmospheric Depth (+4):** To complete the universe without black or white paint, this tool introduces an Indigo Abyss (near-black deep depth), Violet Core (rich shadow), Orange (brilliant warmth), and Burnt Umber (resonant earth tones). 
+        * **The Atmospheric Depth (+4):** To complete the universe without black or white paint, this tool introduces an Indigo Abyss (near-black deep depth), Violet Core (rich shadow), Orange Undercrust (brilliant warmth), and Burnt Umber Crust (resonant earth tones). 
         
         **⚠️ Disclaimer: The Reality of Physical Pigment**
         Digital math provides a flawless theoretical framework, but physical media is delightfully unpredictable. Real paints possess a **mass tone** (how they look applied thickly) and an **undertone** (how they look washed out). As seen with heavy violets or deep blues, a thick application can easily masquerade as pitch black before revealing its true hue. Furthermore, variables like pigment density, granulation, and the medium itself will alter the final mix. 
@@ -124,9 +129,9 @@ with st.sidebar:
             show_core = st.toggle("Enable Core", key="show_core")
             name_core = st.text_input("Core Name", key="name_core")
             hex_core = st.color_picker("Core Color", key="hex_core")
-            show_heat = st.toggle("Enable Heat", key="show_heat")
-            name_heat = st.text_input("Heat Name", key="name_heat")
-            hex_heat = st.color_picker("Heat Color", key="hex_heat")
+            show_heat = st.toggle("Enable Undercrust", key="show_heat")
+            name_heat = st.text_input("Undercrust Name", key="name_heat")
+            hex_heat = st.color_picker("Undercrust Color", key="hex_heat")
         with col4:
             show_luma = st.toggle("Enable Luma", key="show_luma")
             name_luma = st.text_input("Luma Name", key="name_luma")
@@ -135,11 +140,37 @@ with st.sidebar:
             name_crust = st.text_input("Crust Name", key="name_crust")
             hex_crust = st.color_picker("Crust Color", key="hex_crust")
 
-    with st.expander("🎛️ Atmosphere Controls", expanded=False):
+    with st.expander("🎛️ Atmosphere Fine-Tuning", expanded=False):
+        st.markdown("*Adjust the Start Radius (0.0 = Center, 2.0 = Surface) and the Soft Fade distance of each layer.*")
         show_grid = st.toggle("Show Wireframe Grid", key="show_grid")
-        sun_intensity = st.slider("Sun Intensity (Heat Zone)", 0.0, 1.0, key="sun_intensity")
-        shadow_depth = st.slider("Shadow Depth (Core/Abyss)", 0.0, 1.0, key="shadow_depth")
-        brilliance = st.slider("Brilliance (Overlap Spread)", 0.2, 5.0, key="brilliance")
+        brilliance = st.slider("Color Overlap Brilliance", 0.2, 5.0, key="brilliance")
+        
+        st.markdown("---")
+        if show_abyss:
+            st.markdown(f"**{name_abyss}**")
+            c1, c2 = st.columns(2)
+            rad_abyss = c1.slider("Start Radius", 0.0, 2.0, key="rad_abyss", help="How far from the center the Abyss reaches before fading.")
+            fade_abyss = c2.slider("Soft Fade", 0.0, 2.0, key="fade_abyss", help="How smoothly it blends into the next layer.")
+        if show_core:
+            st.markdown(f"**{name_core}**")
+            c1, c2 = st.columns(2)
+            rad_core = c1.slider("Start Radius", 0.0, 2.0, key="rad_core")
+            fade_core = c2.slider("Soft Fade", 0.0, 2.0, key="fade_core")
+        if show_luma:
+            st.markdown(f"**{name_luma}**")
+            c1, c2 = st.columns(2)
+            rad_luma = c1.slider("Start Radius", 0.0, 2.0, key="rad_luma")
+            fade_luma = c2.slider("Soft Fade", 0.0, 2.0, key="fade_luma")
+        if show_heat:
+            st.markdown(f"**{name_heat}**")
+            c1, c2 = st.columns(2)
+            rad_heat = c1.slider("Start Radius", 0.0, 2.0, key="rad_heat")
+            fade_heat = c2.slider("Soft Fade", 0.0, 2.0, key="fade_heat")
+        if show_crust:
+            st.markdown(f"**{name_crust}**")
+            c1, c2 = st.columns(2)
+            rad_crust = c1.slider("Start Radius", 0.0, 2.0, key="rad_crust")
+            fade_crust = c2.slider("Soft Fade", 0.0, 2.0, key="fade_crust")
     
     with st.expander("🔄 Rotation Math", expanded=False):
         st.markdown("*Use mouse-drag on canvas for fluid rotation.*")
@@ -162,6 +193,13 @@ gl_crust, js_crust = hex_to_vectors(hex_crust)
 
 rad_x = rot_x * (math.pi / 180)
 rad_y = rot_y * (math.pi / 180)
+
+# Set defaults to 0 if a layer is toggled off, to prevent JS/GLSL math errors
+r_ab, f_ab = (rad_abyss, fade_abyss) if show_abyss else (0.0, 0.0)
+r_co, f_co = (rad_core, fade_core) if show_core else (0.0, 0.0)
+r_lu, f_lu = (rad_luma, fade_luma) if show_luma else (0.0, 0.0)
+r_he, f_he = (rad_heat, fade_heat) if show_heat else (0.0, 0.0)
+r_cr, f_cr = (rad_crust, fade_crust) if show_crust else (0.0, 0.0)
 
 # 3. The WebGL Engine 
 three_js_code = f"""
@@ -222,15 +260,21 @@ three_js_code = f"""
         document.body.appendChild(renderer.domElement);
 
         const customUniforms = {{
-            uBrilliance: {{ value: {brilliance} }}, uSun: {{ value: {sun_intensity} }},
-            uShadow: {{ value: {shadow_depth} }}, uRotX: {{ value: {rad_x} }}, uRotY: {{ value: {rad_y} }}
+            uBrilliance: {{ value: {brilliance} }}, uRotX: {{ value: {rad_x} }}, uRotY: {{ value: {rad_y} }},
+            uAbRad: {{ value: {r_ab} }}, uAbFade: {{ value: {f_ab} }},
+            uCoRad: {{ value: {r_co} }}, uCoFade: {{ value: {f_co} }},
+            uLuRad: {{ value: {r_lu} }}, uLuFade: {{ value: {f_lu} }},
+            uHeRad: {{ value: {r_he} }}, uHeFade: {{ value: {f_he} }},
+            uCrRad: {{ value: {r_cr} }}, uCrFade: {{ value: {f_cr} }}
         }};
 
         const material = new THREE.ShaderMaterial({{
             side: THREE.DoubleSide, uniforms: customUniforms,
             vertexShader: `varying vec3 vPos; void main() {{ vec4 wp = modelMatrix * vec4(position, 1.0); vPos = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }}`,
             fragmentShader: `
-                uniform float uBrilliance, uSun, uShadow, uRotX, uRotY; varying vec3 vPos;
+                uniform float uBrilliance, uRotX, uRotY; 
+                uniform float uAbRad, uAbFade, uCoRad, uCoFade, uLuRad, uLuFade, uHeRad, uHeFade, uCrRad, uCrFade;
+                varying vec3 vPos;
                 mat3 rx(float a) {{ float s=sin(a), c=cos(a); return mat3(1.,0.,0.,0.,c,-s,0.,s,c); }}
                 mat3 ry(float a) {{ float s=sin(a), c=cos(a); return mat3(c,0.,s,0.,1.,0.,-s,0.,c); }}
                 void main() {{
@@ -239,14 +283,20 @@ three_js_code = f"""
                     vec3 cY = n.y > 0. ? {gl_yp} : {gl_yn}; vec3 cX = n.x > 0. ? {gl_xp} : {gl_xn}; vec3 cZ = n.z > 0. ? {gl_zp} : {gl_zn};
                     float wX = pow(abs(n.x), uBrilliance), wY = pow(abs(n.y), uBrilliance), wZ = pow(abs(n.z), uBrilliance);
                     float tot = wX + wY + wZ; vec3 pC = cX*(wX/tot) + cY*(wY/tot) + cZ*(wZ/tot);
-                    float ce = uShadow * 0.1, cre = 1.88 - (uSun * 0.15);
-                    float v0 = {1 if show_abyss else 0}==1 ? smoothstep(0.0, ce + 0.55, r) : 1.0;
-                    float v1 = {1 if show_core else 0}==1 ? smoothstep(ce + 0.1, ce + 1.2, r) : 1.0;
-                    float v2 = {1 if show_luma else 0}==1 ? smoothstep(cre - 0.65, cre - 0.1, r) : 0.0;
-                    float v3 = {1 if show_heat else 0}==1 ? smoothstep(cre - 0.35, cre - 0.02, r) : 0.0;
-                    float v4 = {1 if show_crust else 0}==1 ? smoothstep(cre - 0.02, 2.0, r) : 0.0;
-                    vec3 fC = {gl_abyss}; fC = mix(fC, {gl_core}, v0); fC = mix(fC, pC, v1);
-                    fC = mix(fC, mix(pC, {gl_luma}, 0.6), v2); fC = mix(fC, mix({gl_heat}, pC, 0.65), v3); fC = mix(fC, mix({gl_crust}, pC, 0.4), v4);
+                    
+                    float v0 = {1 if show_abyss else 0}==1 ? smoothstep(uAbRad, uAbRad + uAbFade, r) : 1.0;
+                    float v1 = {1 if show_core else 0}==1 ? smoothstep(uCoRad, uCoRad + uCoFade, r) : 1.0;
+                    float v2 = {1 if show_luma else 0}==1 ? smoothstep(uLuRad, uLuRad + uLuFade, r) : 0.0;
+                    float v3 = {1 if show_heat else 0}==1 ? smoothstep(uHeRad, uHeRad + uHeFade, r) : 0.0;
+                    float v4 = {1 if show_crust else 0}==1 ? smoothstep(uCrRad, uCrRad + uCrFade, r) : 0.0;
+                    
+                    vec3 fC = {gl_abyss}; 
+                    fC = mix(fC, {gl_core}, v0); 
+                    fC = mix(fC, pC, v1);
+                    fC = mix(fC, mix(pC, {gl_luma}, 0.6), v2); 
+                    fC = mix(fC, mix({gl_heat}, pC, 0.65), v3); 
+                    fC = mix(fC, mix({gl_crust}, pC, 0.4), v4);
+                    
                     gl_FragColor = vec4(fC, 1.0);
                 }}`
         }});
@@ -313,12 +363,11 @@ three_js_code = f"""
                 document.getElementById('p-xp').innerText=py+'%'; document.getElementById('p-xn').innerText=pb+'%';
                 document.getElementById('p-zp').innerText=pg+'%'; document.getElementById('p-zn').innerText=pm+'%';
 
-                let cE = {shadow_depth}*0.1, crE = 1.88-({sun_intensity}*0.15);
-                let v0={1 if show_abyss else 0}===1?sstep(0.0, cE+0.55, r):1.0;
-                let v1={1 if show_core else 0}===1?sstep(cE+0.1, cE+1.2, r):1.0;
-                let v2={1 if show_luma else 0}===1?sstep(crE-0.65, crE-0.1, r):0.0;
-                let v3={1 if show_heat else 0}===1?sstep(crE-0.35, crE-0.02, r):0.0;
-                let v4={1 if show_crust else 0}===1?sstep(crE-0.02, 2.0, r):0.0;
+                let v0={1 if show_abyss else 0}===1?sstep({r_ab}, {r_ab}+{f_ab}, r):1.0;
+                let v1={1 if show_core else 0}===1?sstep({r_co}, {r_co}+{f_co}, r):1.0;
+                let v2={1 if show_luma else 0}===1?sstep({r_lu}, {r_lu}+{f_lu}, r):0.0;
+                let v3={1 if show_heat else 0}===1?sstep({r_he}, {r_he}+{f_he}, r):0.0;
+                let v4={1 if show_crust else 0}===1?sstep({r_cr}, {r_cr}+{f_cr}, r):0.0;
 
                 let zA=((1.-v0)*100).toFixed(1), zC=((v0*(1.-v1))*100).toFixed(1), zP=((v1*(1.-v2))*100).toFixed(1), zW=((v2*(1.-v3))*100).toFixed(1), zO=((v3*(1.-v4))*100).toFixed(1), zU=(v4*100).toFixed(1);
                 document.getElementById('z-abyss').innerText=zA+'%'; document.getElementById('z-core').innerText=zC+'%'; document.getElementById('z-pure').innerText=zP+'%';
