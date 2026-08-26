@@ -142,7 +142,6 @@ three_js_code = f"""
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        /* touch-action: none prevents iPad pull-to-refresh and native zooming */
         body {{ margin: 0; overflow: hidden; background-color: #0e1117; cursor: crosshair; user-select: none; touch-action: none; overscroll-behavior: none; }}
         body:active {{ cursor: grabbing; }}
         canvas {{ display: block; }}
@@ -178,7 +177,7 @@ three_js_code = f"""
         
         #helper-text {{
             position: absolute; bottom: 20px; left: 20px; color: rgba(255,255,255,0.4);
-            font-family: sans-serif; font-size: 12px; pointer-events: none;
+            font-family: sans-serif; font-size: 12px; pointer-events: none; white-space: pre-line;
         }}
     </style>
 </head>
@@ -212,9 +211,14 @@ three_js_code = f"""
         </div>
     </div>
     
-    <div id="helper-text">Pinch/Scroll to Zoom • Drag HUD to move</div>
+    <div id="helper-text">Left-Click / 1-Finger: Rotate
+    Right-Click / 2-Fingers: Pan & Move
+    Scroll / Pinch: Zoom In/Out</div>
 
     <script>
+        // Prevent default right-click menu so we can use it to pan
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({{ antialias: true }});
@@ -304,17 +308,17 @@ three_js_code = f"""
         group.add(wallXY); group.add(wallYZ); group.add(wallXZ);
         scene.add(group);
 
-        // --- ZOOM LOGIC ---
+        // --- NEW CAMERA PAN & ZOOM LOGIC ---
         let currentZoom = 6.0; 
-        let initialPinchDist = null;
+        let panTarget = new THREE.Vector3(0, 0, 0);
 
-        function updateCameraZoom() {{
-            currentZoom = Math.max(2.5, Math.min(15.0, currentZoom)); // Clamp zoom bounds
+        function updateCamera() {{
+            currentZoom = Math.max(2.5, Math.min(25.0, currentZoom)); // Increased zoom-out allowance
             let camVal = currentZoom / Math.sqrt(3);
-            camera.position.set(camVal, camVal, camVal);
-            camera.lookAt(0, 0, 0);
+            camera.position.set(camVal + panTarget.x, camVal + panTarget.y, camVal + panTarget.z);
+            camera.lookAt(panTarget);
         }}
-        updateCameraZoom(); // set initial pos
+        updateCamera();
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -324,9 +328,14 @@ three_js_code = f"""
         const toHex = (c) => c.toString(16).padStart(2, '0').toUpperCase();
 
         let isDragging = false;
+        let isPanning = false;
         let isFrozen = false;
         let lastMousePosition = {{ x: 0, y: 0 }};
         let snapshotData = "";
+
+        // Touch gesture tracking variables
+        let initialPinchDist = null;
+        let lastPinchMidpoint = {{ x: 0, y: 0 }};
 
         // --- HUD DRAG & MINIMIZE LOGIC ---
         const hud = document.getElementById('hud');
@@ -347,36 +356,22 @@ three_js_code = f"""
 
         hudHeader.addEventListener('mousedown', (e) => {{
             if(e.target.id === 'hud-toggle') return;
-            hudDragging = true;
-            hudOffsetX = e.clientX - hud.offsetLeft;
-            hudOffsetY = e.clientY - hud.offsetTop;
+            hudDragging = true; hudOffsetX = e.clientX - hud.offsetLeft; hudOffsetY = e.clientY - hud.offsetTop;
         }});
         hudHeader.addEventListener('touchstart', (e) => {{
             if(e.target.id === 'hud-toggle') return;
-            hudDragging = true;
-            hudOffsetX = e.touches[0].clientX - hud.offsetLeft;
-            hudOffsetY = e.touches[0].clientY - hud.offsetTop;
+            hudDragging = true; hudOffsetX = e.touches[0].clientX - hud.offsetLeft; hudOffsetY = e.touches[0].clientY - hud.offsetTop;
         }}, {{passive: true}});
 
-        // === BUG FIX: STRICTLY STOP DRAGGING ON MOUSE RELEASE ===
-        window.addEventListener('mouseup', () => {{ 
-            hudDragging = false; 
-            isDragging = false; 
-        }});
-        window.addEventListener('mouseleave', () => {{ 
-            hudDragging = false; 
-            isDragging = false; 
-        }});
-        window.addEventListener('touchend', () => {{ 
-            hudDragging = false; 
-            isDragging = false; 
-        }});
+        window.addEventListener('mouseup', () => {{ hudDragging = false; isDragging = false; isPanning = false; }});
+        window.addEventListener('mouseleave', () => {{ hudDragging = false; isDragging = false; isPanning = false; }});
+        window.addEventListener('touchend', () => {{ hudDragging = false; isDragging = false; isPanning = false; initialPinchDist = null; }});
 
         window.addEventListener('mousemove', (e) => {{
             if (hudDragging) {{
                 hud.style.left = (e.clientX - hudOffsetX) + 'px';
                 hud.style.top = (e.clientY - hudOffsetY) + 'px';
-                hud.style.right = 'auto'; // release the snap to right
+                hud.style.right = 'auto'; 
             }}
         }});
         window.addEventListener('touchmove', (e) => {{
@@ -406,7 +401,6 @@ three_js_code = f"""
             toggleFreeze();
         }});
 
-        // Double-Tap Logic for iPad Freeze
         let lastTap = 0;
         document.addEventListener('touchend', function(e) {{
             if(e.target.closest('#hud') || hudDragging) return;
@@ -414,7 +408,6 @@ three_js_code = f"""
             let tapLength = currentTime - lastTap;
             if (tapLength < 400 && tapLength > 0) {{ toggleFreeze(); }}
             lastTap = currentTime;
-            initialPinchDist = null;
         }});
 
         document.getElementById('export-btn').addEventListener('click', function() {{
@@ -425,7 +418,7 @@ three_js_code = f"""
             a.click(); window.URL.revokeObjectURL(url);
         }});
 
-        // --- RAYCASTER LOGIC EXTRACTED ---
+        // --- RAYCASTER LOGIC ---
         function processRaycaster(clientX, clientY) {{
             if(isFrozen) return;
             mouse.x = (clientX / window.innerWidth) * 2 - 1;
@@ -438,6 +431,7 @@ three_js_code = f"""
             let hitPoint = null;
             for(let i = 0; i < intersects.length; i++) {{
                 let pt = intersects[i].point;
+                // Because we move the camera, pt is in World Space. We use the mesh's inherent object space for the cutout detection!
                 if(pt.x > 0.001 && pt.y > 0.001 && pt.z > 0.001) continue; 
                 hitPoint = pt; break;
             }}
@@ -455,9 +449,7 @@ three_js_code = f"""
                 let len = Math.sqrt(spinPos.x*spinPos.x + spinPos.y*spinPos.y + spinPos.z*spinPos.z);
                 let n = {{ x: spinPos.x/len, y: spinPos.y/len, z: spinPos.z/len }};
 
-                let wX = Math.pow(Math.abs(n.x), {brilliance});
-                let wY = Math.pow(Math.abs(n.y), {brilliance});
-                let wZ = Math.pow(Math.abs(n.z), {brilliance});
+                let wX = Math.pow(Math.abs(n.x), {brilliance}); let wY = Math.pow(Math.abs(n.y), {brilliance}); let wZ = Math.pow(Math.abs(n.z), {brilliance});
                 let tot = wX + wY + wZ; wX /= tot; wY /= tot; wZ /= tot;
 
                 let pr = (n.y > 0 ? (wY*100) : 0).toFixed(1); let pc = (n.y <= 0 ? (wY*100) : 0).toFixed(1);
@@ -503,10 +495,12 @@ three_js_code = f"""
             }}
         }}
 
-        // --- MOUSE & TOUCH EVENT LISTENERS ---
+        // --- DESKTOP MOUSE EVENT LISTENERS ---
         document.addEventListener('mousedown', function(e) {{
             if(e.target.closest('#hud')) return;
-            isDragging = true; lastMousePosition = {{ x: e.clientX, y: e.clientY }};
+            if (e.button === 2) {{ isPanning = true; }} // Right click to Pan
+            else {{ isDragging = true; }} // Left click to Rotate
+            lastMousePosition = {{ x: e.clientX, y: e.clientY }};
         }});
         
         document.addEventListener('mousemove', function(e) {{
@@ -514,17 +508,24 @@ three_js_code = f"""
                 let deltaMove = {{ x: e.clientX - lastMousePosition.x, y: e.clientY - lastMousePosition.y }};
                 customUniforms.uRotY.value += deltaMove.x * 0.01; customUniforms.uRotX.value += deltaMove.y * 0.01;
                 lastMousePosition = {{ x: e.clientX, y: e.clientY }};
+            }} else if (isPanning && !hudDragging) {{
+                let dx = e.clientX - lastMousePosition.x; let dy = e.clientY - lastMousePosition.y;
+                let panSpeed = currentZoom * 0.0015;
+                let camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+                let camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+                panTarget.add(camRight.multiplyScalar(-dx * panSpeed)); panTarget.add(camUp.multiplyScalar(dy * panSpeed));
+                updateCamera();
+                lastMousePosition = {{ x: e.clientX, y: e.clientY }};
             }}
             processRaycaster(e.clientX, e.clientY);
         }});
 
-        // Desktop Mouse Wheel Zoom
         document.addEventListener('wheel', function(e) {{
             if(e.target.closest('#hud')) return;
-            currentZoom += e.deltaY * 0.01; updateCameraZoom();
+            currentZoom += e.deltaY * 0.01; updateCamera();
         }});
 
-        // iPad Touch Handlers
+        // --- iPAD TOUCH HANDLERS ---
         document.addEventListener('touchstart', function(e) {{
             if(e.target.closest('#hud')) return;
             if (e.touches.length === 1) {{
@@ -533,6 +534,7 @@ three_js_code = f"""
                 isDragging = false;
                 let dx = e.touches[0].clientX - e.touches[1].clientX; let dy = e.touches[0].clientY - e.touches[1].clientY;
                 initialPinchDist = Math.sqrt(dx*dx + dy*dy);
+                lastPinchMidpoint = {{ x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 }};
             }}
         }}, {{passive: true}});
 
@@ -545,9 +547,21 @@ three_js_code = f"""
                 lastMousePosition = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
                 processRaycaster(e.touches[0].clientX, e.touches[0].clientY);
             }} else if (e.touches.length === 2 && initialPinchDist) {{
+                // Pinch to Zoom
                 let dx = e.touches[0].clientX - e.touches[1].clientX; let dy = e.touches[0].clientY - e.touches[1].clientY;
-                let dist = Math.sqrt(dx*dx + dy*dy); let delta = initialPinchDist - dist;
-                currentZoom += delta * 0.02; updateCameraZoom(); initialPinchDist = dist;
+                let dist = Math.sqrt(dx*dx + dy*dy); let zoomDelta = initialPinchDist - dist;
+                currentZoom += zoomDelta * 0.02; initialPinchDist = dist;
+                
+                // Two-Finger Pan
+                let midX = (e.touches[0].clientX + e.touches[1].clientX)/2; let midY = (e.touches[0].clientY + e.touches[1].clientY)/2;
+                let panDx = midX - lastPinchMidpoint.x; let panDy = midY - lastPinchMidpoint.y;
+                let panSpeed = currentZoom * 0.002;
+                let camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+                let camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+                panTarget.add(camRight.multiplyScalar(-panDx * panSpeed)); panTarget.add(camUp.multiplyScalar(panDy * panSpeed));
+                lastPinchMidpoint = {{ x: midX, y: midY }};
+                
+                updateCamera();
             }}
         }}, {{passive: true}});
 
