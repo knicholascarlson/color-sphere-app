@@ -50,7 +50,7 @@ for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 2. Sidebar Controls (Now fully collapsable)
+# 2. Sidebar Controls
 with st.sidebar:
     st.markdown("### Color Sphere Studio")
     st.markdown("[Find Pigment Hex Codes Here](https://inkswatch.com/)")
@@ -135,25 +135,39 @@ gl_crust, js_crust = hex_to_vectors(hex_crust)
 rad_x = rot_x * (math.pi / 180)
 rad_y = rot_y * (math.pi / 180)
 
-# 3. The WebGL Engine - Height increased to 900 for full screen feel
+# 3. The WebGL Engine 
 three_js_code = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {{ margin: 0; overflow: hidden; background-color: #0e1117; cursor: crosshair; user-select: none; }}
+        /* touch-action: none prevents iPad pull-to-refresh and native zooming */
+        body {{ margin: 0; overflow: hidden; background-color: #0e1117; cursor: crosshair; user-select: none; touch-action: none; overscroll-behavior: none; }}
         body:active {{ cursor: grabbing; }}
         canvas {{ display: block; }}
         
         #hud {{
             position: absolute; top: 20px; right: 20px; color: #e0e0e0;
             font-family: 'Courier New', Courier, monospace; font-size: 13px;
-            background: rgba(15, 17, 23, 0.9); padding: 15px; border-radius: 8px;
+            background: rgba(15, 17, 23, 0.9); border-radius: 8px;
             pointer-events: auto; border: 2px solid rgba(255, 255, 255, 0.15);
             width: 280px; box-shadow: 0px 4px 15px rgba(0,0,0,0.5); transition: border-color 0.2s;
+            z-index: 100;
         }}
-        .hud-section {{ margin-top: 10px; margin-bottom: 5px; color: #ffffff; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 3px; }}
+        #hud-header {{
+            background: rgba(255, 255, 255, 0.1); padding: 8px 12px; cursor: move;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px 6px 0 0;
+        }}
+        #hud-header span {{ font-weight: bold; font-size: 12px; pointer-events: none; }}
+        #hud-toggle {{
+            cursor: pointer; padding: 2px 8px; background: rgba(255,255,255,0.2); 
+            border-radius: 4px; pointer-events: auto !important; font-size: 14px !important;
+        }}
+        #hud-content {{ padding: 15px; }}
+        
+        .hud-section {{ margin-top: 5px; margin-bottom: 5px; color: #ffffff; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 3px; }}
         .row {{ display: flex; justify-content: space-between; margin-bottom: 2px; }}
         #swatch {{ width: 100%; height: 30px; border-radius: 4px; border: 1px solid #555; margin-bottom: 5px; background-color: #000; }}
         #hex-code {{ text-align: center; font-weight: bold; letter-spacing: 2px; margin-bottom: 5px; color: #fff; }}
@@ -162,7 +176,6 @@ three_js_code = f"""
         #export-btn {{ display: none; width: 100%; padding: 8px; margin-top: 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; }}
         #export-btn:hover {{ background: #45a049; }}
         
-        /* Subtle helper text overlay */
         #helper-text {{
             position: absolute; bottom: 20px; left: 20px; color: rgba(255,255,255,0.4);
             font-family: sans-serif; font-size: 12px; pointer-events: none;
@@ -171,29 +184,35 @@ three_js_code = f"""
 </head>
 <body>
     <div id="hud">
-        <div id="freeze-status">[ FROZEN - DBL CLICK TO UNLOCK ]</div>
-        <div id="swatch"></div>
-        <div id="hex-code">#000000</div>
-        
-        <div class="hud-section">Pigment Blend</div>
-        <div class="row"><span>{name_y_pos} (Y+)</span><span id="p-yp">0%</span></div>
-        <div class="row"><span>{name_y_neg} (Y-)</span><span id="p-yn">0%</span></div>
-        <div class="row"><span>{name_x_pos} (X+)</span><span id="p-xp">0%</span></div>
-        <div class="row"><span>{name_x_neg} (X-)</span><span id="p-xn">0%</span></div>
-        <div class="row"><span>{name_z_pos} (Z+)</span><span id="p-zp">0%</span></div>
-        <div class="row"><span>{name_z_neg} (Z-)</span><span id="p-zn">0%</span></div>
-        
-        <div class="hud-section">Atmospheric Depth</div>
-        <div class="row"><span>{name_core}</span><span id="z-core">0%</span></div>
-        <div class="row"><span>Pure Mantle</span><span id="z-pure">0%</span></div>
-        <div class="row"><span>{name_luma}</span><span id="z-white">0%</span></div>
-        <div class="row"><span>{name_heat}</span><span id="z-orange">0%</span></div>
-        <div class="row"><span>{name_crust}</span><span id="z-umber">0%</span></div>
-        
-        <button id="export-btn">Export Pixel Snapshot to TXT</button>
+        <div id="hud-header">
+            <span>DATA HUD</span>
+            <span id="hud-toggle">–</span>
+        </div>
+        <div id="hud-content">
+            <div id="freeze-status">[ FROZEN - DBL CLICK/TAP TO UNLOCK ]</div>
+            <div id="swatch"></div>
+            <div id="hex-code">#000000</div>
+            
+            <div class="hud-section">Pigment Blend</div>
+            <div class="row"><span>{name_y_pos} (Y+)</span><span id="p-yp">0%</span></div>
+            <div class="row"><span>{name_y_neg} (Y-)</span><span id="p-yn">0%</span></div>
+            <div class="row"><span>{name_x_pos} (X+)</span><span id="p-xp">0%</span></div>
+            <div class="row"><span>{name_x_neg} (X-)</span><span id="p-xn">0%</span></div>
+            <div class="row"><span>{name_z_pos} (Z+)</span><span id="p-zp">0%</span></div>
+            <div class="row"><span>{name_z_neg} (Z-)</span><span id="p-zn">0%</span></div>
+            
+            <div class="hud-section">Atmospheric Depth</div>
+            <div class="row"><span>{name_core}</span><span id="z-core">0%</span></div>
+            <div class="row"><span>Pure Mantle</span><span id="z-pure">0%</span></div>
+            <div class="row"><span>{name_luma}</span><span id="z-white">0%</span></div>
+            <div class="row"><span>{name_heat}</span><span id="z-orange">0%</span></div>
+            <div class="row"><span>{name_crust}</span><span id="z-umber">0%</span></div>
+            
+            <button id="export-btn">Export Pixel Snapshot to TXT</button>
+        </div>
     </div>
     
-    <div id="helper-text">Drag to rotate • Double-click to freeze/export</div>
+    <div id="helper-text">Pinch/Scroll to Zoom • Drag HUD to move</div>
 
     <script>
         const scene = new THREE.Scene();
@@ -234,7 +253,6 @@ three_js_code = f"""
                 
                 void main() {{
                     if(vUnifiedPos.x > 0.001 && vUnifiedPos.y > 0.001 && vUnifiedPos.z > 0.001) {{ discard; }}
-
                     float r = length(vUnifiedPos);
                     vec3 spinPos = rotX(uRotX) * rotY(uRotY) * vUnifiedPos;
                     vec3 n = normalize(spinPos);
@@ -253,7 +271,6 @@ three_js_code = f"""
                     vec3 darkViolet = {gl_core}; 
                     vec3 baseOrange = {gl_heat};
                     vec3 brightColor = mix(pureColor, {gl_luma}, 0.6); 
-                    
                     vec3 resurgentColor = mix(baseOrange, pureColor, 0.65); 
                     vec3 darkUmber = mix({gl_crust}, pureColor, 0.4); 
                     
@@ -276,11 +293,8 @@ three_js_code = f"""
         group.add(new THREE.Mesh(sphereGeo, material));
 
         if ({"true" if show_grid else "false"}) {{
-            const wireMaterial = new THREE.MeshBasicMaterial({{ 
-                color: 0xffffff, wireframe: true, transparent: true, opacity: 0.15 
-            }});
-            const wireSphere = new THREE.Mesh(sphereGeo, wireMaterial);
-            group.add(wireSphere);
+            const wireMaterial = new THREE.MeshBasicMaterial({{ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.15 }});
+            group.add(new THREE.Mesh(sphereGeo, wireMaterial));
         }}
 
         const wallGeo = new THREE.CircleGeometry(2, 32, 0, Math.PI / 2);
@@ -290,19 +304,23 @@ three_js_code = f"""
         group.add(wallXY); group.add(wallYZ); group.add(wallXZ);
         scene.add(group);
 
-        camera.position.set(3.464, 3.464, 3.464);
-        camera.lookAt(0, 0, 0);
+        // --- ZOOM LOGIC ---
+        let currentZoom = 6.0; 
+        let initialPinchDist = null;
+
+        function updateCameraZoom() {{
+            currentZoom = Math.max(2.5, Math.min(15.0, currentZoom)); // Clamp zoom bounds
+            let camVal = currentZoom / Math.sqrt(3);
+            camera.position.set(camVal, camVal, camVal);
+            camera.lookAt(0, 0, 0);
+        }}
+        updateCameraZoom(); // set initial pos
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        function smoothstep(min, max, value) {{
-            let x = Math.max(0, Math.min(1, (value - min) / (max - min)));
-            return x * x * (3 - 2 * x);
-        }}
-        function mixVec(v1, v2, amount) {{
-            return [v1[0]*(1-amount) + v2[0]*amount, v1[1]*(1-amount) + v2[1]*amount, v1[2]*(1-amount) + v2[2]*amount];
-        }}
+        function smoothstep(min, max, value) {{ let x = Math.max(0, Math.min(1, (value - min) / (max - min))); return x * x * (3 - 2 * x); }}
+        function mixVec(v1, v2, amount) {{ return [v1[0]*(1-amount) + v2[0]*amount, v1[1]*(1-amount) + v2[1]*amount, v1[2]*(1-amount) + v2[2]*amount]; }}
         const toHex = (c) => c.toString(16).padStart(2, '0').toUpperCase();
 
         let isDragging = false;
@@ -310,11 +328,68 @@ three_js_code = f"""
         let lastMousePosition = {{ x: 0, y: 0 }};
         let snapshotData = "";
 
-        document.addEventListener('dblclick', function(e) {{
-            if(e.target.closest('#hud')) return; 
+        // --- HUD DRAG & MINIMIZE LOGIC ---
+        const hud = document.getElementById('hud');
+        const hudHeader = document.getElementById('hud-header');
+        const hudContent = document.getElementById('hud-content');
+        const hudToggle = document.getElementById('hud-toggle');
+        
+        let hudDragging = false;
+        let hudOffsetX = 0, hudOffsetY = 0;
+
+        hudToggle.addEventListener('click', () => {{
+            if (hudContent.style.display === 'none') {{
+                hudContent.style.display = 'block'; hudToggle.innerText = '–';
+            }} else {{
+                hudContent.style.display = 'none'; hudToggle.innerText = '+';
+            }}
+        }});
+
+        hudHeader.addEventListener('mousedown', (e) => {{
+            if(e.target.id === 'hud-toggle') return;
+            hudDragging = true;
+            hudOffsetX = e.clientX - hud.offsetLeft;
+            hudOffsetY = e.clientY - hud.offsetTop;
+        }});
+        hudHeader.addEventListener('touchstart', (e) => {{
+            if(e.target.id === 'hud-toggle') return;
+            hudDragging = true;
+            hudOffsetX = e.touches[0].clientX - hud.offsetLeft;
+            hudOffsetY = e.touches[0].clientY - hud.offsetTop;
+        }}, {{passive: true}});
+
+        // === BUG FIX: STRICTLY STOP DRAGGING ON MOUSE RELEASE ===
+        window.addEventListener('mouseup', () => {{ 
+            hudDragging = false; 
+            isDragging = false; 
+        }});
+        window.addEventListener('mouseleave', () => {{ 
+            hudDragging = false; 
+            isDragging = false; 
+        }});
+        window.addEventListener('touchend', () => {{ 
+            hudDragging = false; 
+            isDragging = false; 
+        }});
+
+        window.addEventListener('mousemove', (e) => {{
+            if (hudDragging) {{
+                hud.style.left = (e.clientX - hudOffsetX) + 'px';
+                hud.style.top = (e.clientY - hudOffsetY) + 'px';
+                hud.style.right = 'auto'; // release the snap to right
+            }}
+        }});
+        window.addEventListener('touchmove', (e) => {{
+            if (hudDragging) {{
+                hud.style.left = (e.touches[0].clientX - hudOffsetX) + 'px';
+                hud.style.top = (e.touches[0].clientY - hudOffsetY) + 'px';
+                hud.style.right = 'auto';
+            }}
+        }}, {{passive: true}});
+
+        // --- FREEZE / UNFREEZE FUNCTION ---
+        function toggleFreeze() {{
             isFrozen = !isFrozen;
-            const hud = document.getElementById('hud');
-            
             if(isFrozen) {{
                 hud.style.borderColor = 'gold';
                 document.getElementById('freeze-status').style.display = 'block';
@@ -324,33 +399,37 @@ three_js_code = f"""
                 document.getElementById('freeze-status').style.display = 'none';
                 document.getElementById('export-btn').style.display = 'none';
             }}
+        }}
+
+        document.addEventListener('dblclick', function(e) {{
+            if(e.target.closest('#hud')) return; 
+            toggleFreeze();
+        }});
+
+        // Double-Tap Logic for iPad Freeze
+        let lastTap = 0;
+        document.addEventListener('touchend', function(e) {{
+            if(e.target.closest('#hud') || hudDragging) return;
+            let currentTime = new Date().getTime();
+            let tapLength = currentTime - lastTap;
+            if (tapLength < 400 && tapLength > 0) {{ toggleFreeze(); }}
+            lastTap = currentTime;
+            initialPinchDist = null;
         }});
 
         document.getElementById('export-btn').addEventListener('click', function() {{
             const blob = new Blob([snapshotData], {{ type: 'text/plain' }});
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
+            const a = document.createElement('a'); a.href = url;
             a.download = 'PigmentSnapshot_' + document.getElementById('hex-code').innerText + '.txt';
-            a.click();
-            window.URL.revokeObjectURL(url);
+            a.click(); window.URL.revokeObjectURL(url);
         }});
 
-        document.addEventListener('mousedown', function(e) {{ isDragging = true; }});
-        document.addEventListener('mouseup', function(e) {{ isDragging = false; }});
-        
-        document.addEventListener('mousemove', function(e) {{
-            if(isDragging) {{
-                let deltaMove = {{ x: e.offsetX - lastMousePosition.x, y: e.offsetY - lastMousePosition.y }};
-                customUniforms.uRotY.value += deltaMove.x * 0.01;
-                customUniforms.uRotX.value += deltaMove.y * 0.01;
-            }}
-            lastMousePosition = {{ x: e.offsetX, y: e.offsetY }};
-
+        // --- RAYCASTER LOGIC EXTRACTED ---
+        function processRaycaster(clientX, clientY) {{
             if(isFrozen) return;
-
-            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
             const intersectableObjects = group.children.filter(child => child.material.wireframe !== true);
@@ -360,8 +439,7 @@ three_js_code = f"""
             for(let i = 0; i < intersects.length; i++) {{
                 let pt = intersects[i].point;
                 if(pt.x > 0.001 && pt.y > 0.001 && pt.z > 0.001) continue; 
-                hitPoint = pt;
-                break;
+                hitPoint = pt; break;
             }}
 
             if(hitPoint) {{
@@ -380,120 +458,104 @@ three_js_code = f"""
                 let wX = Math.pow(Math.abs(n.x), {brilliance});
                 let wY = Math.pow(Math.abs(n.y), {brilliance});
                 let wZ = Math.pow(Math.abs(n.z), {brilliance});
-                let tot = wX + wY + wZ;
-                wX /= tot; wY /= tot; wZ /= tot;
+                let tot = wX + wY + wZ; wX /= tot; wY /= tot; wZ /= tot;
 
-                let pr = (n.y > 0 ? (wY*100) : 0).toFixed(1);
-                let pc = (n.y <= 0 ? (wY*100) : 0).toFixed(1);
-                let py = (n.x > 0 ? (wX*100) : 0).toFixed(1);
-                let pb = (n.x <= 0 ? (wX*100) : 0).toFixed(1);
-                let pg = (n.z > 0 ? (wZ*100) : 0).toFixed(1);
-                let pm = (n.z <= 0 ? (wZ*100) : 0).toFixed(1);
+                let pr = (n.y > 0 ? (wY*100) : 0).toFixed(1); let pc = (n.y <= 0 ? (wY*100) : 0).toFixed(1);
+                let py = (n.x > 0 ? (wX*100) : 0).toFixed(1); let pb = (n.x <= 0 ? (wX*100) : 0).toFixed(1);
+                let pg = (n.z > 0 ? (wZ*100) : 0).toFixed(1); let pm = (n.z <= 0 ? (wZ*100) : 0).toFixed(1);
 
-                document.getElementById('p-yp').innerText = pr + '%';
-                document.getElementById('p-yn').innerText = pc + '%';
-                document.getElementById('p-xp').innerText = py + '%';
-                document.getElementById('p-xn').innerText = pb + '%';
-                document.getElementById('p-zp').innerText = pg + '%';
-                document.getElementById('p-zn').innerText = pm + '%';
+                document.getElementById('p-yp').innerText = pr + '%'; document.getElementById('p-yn').innerText = pc + '%';
+                document.getElementById('p-xp').innerText = py + '%'; document.getElementById('p-xn').innerText = pb + '%';
+                document.getElementById('p-zp').innerText = pg + '%'; document.getElementById('p-zn').innerText = pm + '%';
 
-                let coreEdge = {shadow_depth} * 0.1; 
-                let crustEdge = 1.88 - ({sun_intensity} * 0.15);
-                
-                let v1 = smoothstep(coreEdge, coreEdge + 1.3, r);
-                let v2 = smoothstep(crustEdge - 0.65, crustEdge - 0.1, r);
-                let v3 = smoothstep(crustEdge - 0.35, crustEdge - 0.02, r);
-                let v4 = smoothstep(crustEdge - 0.02, 2.0, r);
+                let coreEdge = {shadow_depth} * 0.1; let crustEdge = 1.88 - ({sun_intensity} * 0.15);
+                let v1 = smoothstep(coreEdge, coreEdge + 1.3, r); let v2 = smoothstep(crustEdge - 0.65, crustEdge - 0.1, r);
+                let v3 = smoothstep(crustEdge - 0.35, crustEdge - 0.02, r); let v4 = smoothstep(crustEdge - 0.02, 2.0, r);
 
-                let zCore = ((1.0 - v1) * 100).toFixed(1);
-                let zPure = ((v1 * (1.0 - v2)) * 100).toFixed(1);
-                let zWhite = ((v2 * (1.0 - v3)) * 100).toFixed(1);
-                let zOrange = ((v3 * (1.0 - v4)) * 100).toFixed(1);
+                let zCore = ((1.0 - v1) * 100).toFixed(1); let zPure = ((v1 * (1.0 - v2)) * 100).toFixed(1);
+                let zWhite = ((v2 * (1.0 - v3)) * 100).toFixed(1); let zOrange = ((v3 * (1.0 - v4)) * 100).toFixed(1);
                 let zUmber = (v4 * 100).toFixed(1);
 
-                document.getElementById('z-core').innerText = zCore + '%';
-                document.getElementById('z-pure').innerText = zPure + '%';
-                document.getElementById('z-white').innerText = zWhite + '%';
-                document.getElementById('z-orange').innerText = zOrange + '%';
+                document.getElementById('z-core').innerText = zCore + '%'; document.getElementById('z-pure').innerText = zPure + '%';
+                document.getElementById('z-white').innerText = zWhite + '%'; document.getElementById('z-orange').innerText = zOrange + '%';
                 document.getElementById('z-umber').innerText = zUmber + '%';
                 
-                let colorY = n.y > 0 ? {js_yp} : {js_yn};
-                let colorX = n.x > 0 ? {js_xp} : {js_xn};
-                let colorZ = n.z > 0 ? {js_zp} : {js_zn};
-
-                let pureRGB = [
-                    colorX[0]*wX + colorY[0]*wY + colorZ[0]*wZ,
-                    colorX[1]*wX + colorY[1]*wY + colorZ[1]*wZ,
-                    colorX[2]*wX + colorY[2]*wY + colorZ[2]*wZ
-                ];
+                let colorY = n.y > 0 ? {js_yp} : {js_yn}; let colorX = n.x > 0 ? {js_xp} : {js_xn}; let colorZ = n.z > 0 ? {js_zp} : {js_zn};
+                let pureRGB = [ colorX[0]*wX + colorY[0]*wY + colorZ[0]*wZ, colorX[1]*wX + colorY[1]*wY + colorZ[1]*wZ, colorX[2]*wX + colorY[2]*wY + colorZ[2]*wZ ];
 
                 let fColor = {js_core}; 
-                fColor = mixVec(fColor, pureRGB, v1);
-                fColor = mixVec(fColor, mixVec(pureRGB, {js_luma}, 0.6), v2);
-                fColor = mixVec(fColor, mixVec({js_heat}, pureRGB, 0.65), v3);
-                fColor = mixVec(fColor, mixVec({js_crust}, pureRGB, 0.4), v4);
+                fColor = mixVec(fColor, pureRGB, v1); fColor = mixVec(fColor, mixVec(pureRGB, {js_luma}, 0.6), v2);
+                fColor = mixVec(fColor, mixVec({js_heat}, pureRGB, 0.65), v3); fColor = mixVec(fColor, mixVec({js_crust}, pureRGB, 0.4), v4);
                 
-                let rVal = Math.round(fColor[0]*255);
-                let gVal = Math.round(fColor[1]*255);
-                let bVal = Math.round(fColor[2]*255);
+                let rVal = Math.round(fColor[0]*255); let gVal = Math.round(fColor[1]*255); let bVal = Math.round(fColor[2]*255);
                 let hexStr = "#" + toHex(rVal) + toHex(gVal) + toHex(bVal);
 
                 document.getElementById('swatch').style.backgroundColor = `rgb(${{rVal}}, ${{gVal}}, ${{bVal}})`;
                 document.getElementById('hex-code').innerText = hexStr;
                 
-                let degX = (customUniforms.uRotX.value * 180 / Math.PI) % 360;
-                let degY = (customUniforms.uRotY.value * 180 / Math.PI) % 360;
-                if (degX < 0) degX += 360;
-                if (degY < 0) degY += 360;
+                let degX = (customUniforms.uRotX.value * 180 / Math.PI) % 360; let degY = (customUniforms.uRotY.value * 180 / Math.PI) % 360;
+                if (degX < 0) degX += 360; if (degY < 0) degY += 360;
 
-                snapshotData = `CUSTOM PIGMENT SPHERE SNAPSHOT
-------------------------------
-Final Hex Code:  ${{hexStr}}
-Final RGB Value: (${{rVal}}, ${{gVal}}, ${{bVal}})
-
-PIGMENT BLEND
--------------
-{name_y_pos}: ${{pr}}%
-{name_y_neg}: ${{pc}}%
-{name_x_pos}: ${{py}}%
-{name_x_neg}: ${{pb}}%
-{name_z_pos}: ${{pg}}%
-{name_z_neg}: ${{pm}}%
-
-ATMOSPHERIC DEPTH
------------------
-{name_core}: ${{zCore}}%
-Pure Mantle: ${{zPure}}%
-{name_luma}: ${{zWhite}}%
-{name_heat}: ${{zOrange}}%
-{name_crust}: ${{zUmber}}%
-
-RESTORATION COORDINATES
------------------------
-Latitude:  ${{Math.round(degX)}}
-Longitude: ${{Math.round(degY)}}
-`;
-
+                snapshotData = `CUSTOM PIGMENT SPHERE SNAPSHOT\\n------------------------------\\nFinal Hex Code:  ${{hexStr}}\\nFinal RGB Value: (${{rVal}}, ${{gVal}}, ${{bVal}})\\n\\nPIGMENT BLEND\\n-------------\\n{name_y_pos}: ${{pr}}%\\n{name_y_neg}: ${{pc}}%\\n{name_x_pos}: ${{py}}%\\n{name_x_neg}: ${{pb}}%\\n{name_z_pos}: ${{pg}}%\\n{name_z_neg}: ${{pm}}%\\n\\nATMOSPHERIC DEPTH\\n-----------------\\n{name_core}: ${{zCore}}%\\nPure Mantle: ${{zPure}}%\\n{name_luma}: ${{zWhite}}%\\n{name_heat}: ${{zOrange}}%\\n{name_crust}: ${{zUmber}}%\\n\\nRESTORATION COORDINATES\\n-----------------------\\nLatitude:  ${{Math.round(degX)}}\\nLongitude: ${{Math.round(degY)}}\\n`;
             }} else {{
                 document.querySelectorAll('.row span:nth-child(2)').forEach(el => el.innerText = '0%');
-                document.getElementById('swatch').style.backgroundColor = '#000';
-                document.getElementById('hex-code').innerText = '-------';
-                snapshotData = "";
+                document.getElementById('swatch').style.backgroundColor = '#000'; document.getElementById('hex-code').innerText = '-------'; snapshotData = "";
             }}
+        }}
+
+        // --- MOUSE & TOUCH EVENT LISTENERS ---
+        document.addEventListener('mousedown', function(e) {{
+            if(e.target.closest('#hud')) return;
+            isDragging = true; lastMousePosition = {{ x: e.clientX, y: e.clientY }};
+        }});
+        
+        document.addEventListener('mousemove', function(e) {{
+            if(isDragging && !hudDragging) {{
+                let deltaMove = {{ x: e.clientX - lastMousePosition.x, y: e.clientY - lastMousePosition.y }};
+                customUniforms.uRotY.value += deltaMove.x * 0.01; customUniforms.uRotX.value += deltaMove.y * 0.01;
+                lastMousePosition = {{ x: e.clientX, y: e.clientY }};
+            }}
+            processRaycaster(e.clientX, e.clientY);
         }});
 
-        // Handle window resizing smoothly
-        window.addEventListener('resize', onWindowResize, false);
-        function onWindowResize() {{
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }}
+        // Desktop Mouse Wheel Zoom
+        document.addEventListener('wheel', function(e) {{
+            if(e.target.closest('#hud')) return;
+            currentZoom += e.deltaY * 0.01; updateCameraZoom();
+        }});
 
-        function animate() {{
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }}
+        // iPad Touch Handlers
+        document.addEventListener('touchstart', function(e) {{
+            if(e.target.closest('#hud')) return;
+            if (e.touches.length === 1) {{
+                isDragging = true; lastMousePosition = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+            }} else if (e.touches.length === 2) {{
+                isDragging = false;
+                let dx = e.touches[0].clientX - e.touches[1].clientX; let dy = e.touches[0].clientY - e.touches[1].clientY;
+                initialPinchDist = Math.sqrt(dx*dx + dy*dy);
+            }}
+        }}, {{passive: true}});
+
+        document.addEventListener('touchmove', function(e) {{
+            if(e.target.closest('#hud') || hudDragging) return;
+            
+            if (e.touches.length === 1 && isDragging) {{
+                let deltaMove = {{ x: e.touches[0].clientX - lastMousePosition.x, y: e.touches[0].clientY - lastMousePosition.y }};
+                customUniforms.uRotY.value += deltaMove.x * 0.01; customUniforms.uRotX.value += deltaMove.y * 0.01;
+                lastMousePosition = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+                processRaycaster(e.touches[0].clientX, e.touches[0].clientY);
+            }} else if (e.touches.length === 2 && initialPinchDist) {{
+                let dx = e.touches[0].clientX - e.touches[1].clientX; let dy = e.touches[0].clientY - e.touches[1].clientY;
+                let dist = Math.sqrt(dx*dx + dy*dy); let delta = initialPinchDist - dist;
+                currentZoom += delta * 0.02; updateCameraZoom(); initialPinchDist = dist;
+            }}
+        }}, {{passive: true}});
+
+        window.addEventListener('resize', () => {{
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+        }});
+
+        function animate() {{ requestAnimationFrame(animate); renderer.render(scene, camera); }}
         animate();
     </script>
 </body>
