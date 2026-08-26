@@ -56,20 +56,24 @@ with st.sidebar:
     
     with st.expander("📖 About & Guide", expanded=False):
         st.markdown("""
-        **The Philosophy: Brilliant Depth, Zero Mud**
-        For an artist, the ultimate goal is palette accessibility—using the most efficient range of pigments to create illuminating, dramatic images without them ever turning dark, dull, or muddy. 
+        **Built Strictly for Physical Artists**
+        In digital art, pure white and flat black are necessary pixels. In physical art, they are redundant. Every painter already knows what the blank white of their paper looks like, and they know what a tube of flat black looks like. You do not need a visualizer to imagine them. 
         
-        Mixing three carefully chosen colors is the ultimate way to avoid muddiness. By visually mapping out your pigments, you can intentionally avoid mixing exact opposites (like pure red and cyan), ensuring your mixes remain clean and vibrant. It bridges the gap between digital color (RGB/CMY) and traditional pigment mixing.
+        Because of this, the Color Sphere deliberately avoids rendering pure white or flat black. Instead, it is designed to explore the profound, rich spectrum *between* the extremes. It proves you can achieve luminous brightness and cavernous depth using only pure pigments, without ever relying on dulling agents.
+        
+        **The Philosophy: Brilliant Depth, Zero Mud**
+        For an artist, the ultimate goal is palette accessibility—using the most efficient range of pigments to create illuminating, dramatic images without them turning muddy. By visually mapping out your pigments, you can intentionally avoid mixing exact opposites (like pure red and cyan), ensuring your mixes remain clean and vibrant.
 
         **The 6+3 Minimalist Palette**
-        You can achieve a staggering gamut of color with just 6 to 9 specific pigments, avoiding the use of flat Black entirely to create natural, dramatic shadows.
+        You can achieve a staggering gamut of color with just 6 to 9 specific pigments:
         * **The 6 Anchors:** Red, Green, Blue (RGB) and Cyan, Magenta, Yellow (CMY). 
-        * **The Atmospheric Depth (+3):** The RGB/CMY spectrum naturally lacks rich purples and earthy oranges. To complete the universe, this tool introduces Violet (for natural, deep darkness without black), Orange (for brilliant warmth), and Burnt Umber (for deep, resonant earth tones). 
+        * **The Atmospheric Depth (+3):** The spectrum naturally lacks rich purples and earthy oranges. To complete the universe, this tool introduces Violet (for deep darkness without black), Orange (for brilliant warmth), and Burnt Umber (for resonant earth tones). 
         
         **How to Use This Tool**
         * **Map Your Inks:** Replace the default digital colors with the exact hex codes of the physical paints or inks you own. 
         * **Test Limited Palettes:** If you only own three primary colors, input them across the six poles to see the exact gamut of what those three colors can achieve.
-        * **Extract the Formula:** Spin the sphere to explore unexpected harmonies. Double-click (or double-tap on iPad) to freeze the sphere. The Data HUD will reveal the exact percentage of each pigment required to mix that specific hue on your physical palette.
+        * **Toggle the Atmosphere:** Don't have Burnt Umber or Violet? Turn them off in the Atmosphere tab, or use the provided mixing recipes.
+        * **Extract the Formula:** Spin the sphere to explore. Double-click (or double-tap on iPad) to freeze it. The Data HUD will reveal the exact percentage of each pigment required to mix that specific hue on your physical palette.
         
         ---
         *Questions or feedback? Please contact the original poster of this tool!*
@@ -166,7 +170,7 @@ gl_crust, js_crust = hex_to_vectors(hex_crust)
 rad_x = rot_x * (math.pi / 180)
 rad_y = rot_y * (math.pi / 180)
 
-# 3. The WebGL Engine 
+# 3. The WebGL Engine (Reformatted strictly for safe Copy-Pasting)
 three_js_code = f"""
 <!DOCTYPE html>
 <html>
@@ -191,7 +195,10 @@ three_js_code = f"""
             border-bottom: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px 6px 0 0;
         }}
         #hud-header span {{ font-weight: bold; font-size: 12px; pointer-events: none; }}
-        #hud-toggle {{ cursor: pointer; padding: 2px 8px; background: rgba(255,255,255,0.2); border-radius: 4px; pointer-events: auto !important; font-size: 14px !important; }}
+        #hud-toggle {{
+            cursor: pointer; padding: 2px 8px; background: rgba(255,255,255,0.2); 
+            border-radius: 4px; pointer-events: auto !important; font-size: 14px !important;
+        }}
         #hud-content {{ padding: 15px; }}
         
         .hud-section {{ margin-top: 5px; margin-bottom: 5px; color: #ffffff; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 3px; }}
@@ -296,7 +303,6 @@ three_js_code = f"""
                     float total = wX + wY + wZ;
                     vec3 pureColor = colorX * (wX/total) + colorY * (wY/total) + colorZ * (wZ/total);
 
-                    // Dynamic Toggling Math
                     float v1 = {1 if show_core else 0} == 1 ? smoothstep(uShadow * 0.1, (uShadow * 0.1) + 1.3, r) : 1.0;
                     float crustEdge = 1.88 - (uSun * 0.15);
                     float v2 = {1 if show_luma else 0} == 1 ? smoothstep(crustEdge - 0.65, crustEdge - 0.1, r) : 0.0;
@@ -344,14 +350,28 @@ three_js_code = f"""
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        function smoothstep(min, max, value) {{ let x = Math.max(0, Math.min(1, (value - min) / (max - min))); return x * x * (3 - 2 * x); }}
-        function mixVec(v1, v2, amount) {{ return [v1[0]*(1-amount) + v2[0]*amount, v1[1]*(1-amount) + v2[1]*amount, v1[2]*(1-amount) + v2[2]*amount]; }}
+        function smoothstep(min, max, value) {{ 
+            let x = Math.max(0, Math.min(1, (value - min) / (max - min))); 
+            return x * x * (3 - 2 * x); 
+        }}
+        
+        function mixVec(v1, v2, amount) {{ 
+            return [
+                v1[0]*(1-amount) + v2[0]*amount, 
+                v1[1]*(1-amount) + v2[1]*amount, 
+                v1[2]*(1-amount) + v2[2]*amount
+            ]; 
+        }}
+        
         const toHex = (c) => c.toString(16).padStart(2, '0').toUpperCase();
 
-        let isDragging = false, isPanning = false, isFrozen = false;
+        let isDragging = false;
+        let isPanning = false;
+        let isFrozen = false;
         let lastMousePosition = {{ x: 0, y: 0 }};
         let snapshotData = "";
-        let initialPinchDist = null, lastPinchMidpoint = {{ x: 0, y: 0 }};
+        let initialPinchDist = null;
+        let lastPinchMidpoint = {{ x: 0, y: 0 }};
 
         const hud = document.getElementById('hud');
         const hudHeader = document.getElementById('hud-header');
@@ -359,51 +379,82 @@ three_js_code = f"""
         const hudToggle = document.getElementById('hud-toggle');
         
         let hudDragging = false;
-        let hudOffsetX = 0, hudOffsetY = 0;
+        let hudOffsetX = 0;
+        let hudOffsetY = 0;
 
         hudToggle.addEventListener('click', () => {{
             if (hudContent.style.display === 'none') {{
-                hudContent.style.display = 'block'; hudToggle.innerText = '–';
+                hudContent.style.display = 'block'; 
+                hudToggle.innerText = '–';
             }} else {{
-                hudContent.style.display = 'none'; hudToggle.innerText = '+';
+                hudContent.style.display = 'none'; 
+                hudToggle.innerText = '+';
             }}
         }});
 
         hudHeader.addEventListener('mousedown', (e) => {{
             if(e.target.id === 'hud-toggle') return;
-            hudDragging = true; hudOffsetX = e.clientX - hud.offsetLeft; hudOffsetY = e.clientY - hud.offsetTop;
+            hudDragging = true; 
+            hudOffsetX = e.clientX - hud.offsetLeft; 
+            hudOffsetY = e.clientY - hud.offsetTop;
         }});
+        
         hudHeader.addEventListener('touchstart', (e) => {{
             if(e.target.id === 'hud-toggle') return;
-            hudDragging = true; hudOffsetX = e.touches[0].clientX - hud.offsetLeft; hudOffsetY = e.touches[0].clientY - hud.offsetTop;
+            hudDragging = true; 
+            hudOffsetX = e.touches[0].clientX - hud.offsetLeft; 
+            hudOffsetY = e.touches[0].clientY - hud.offsetTop;
         }}, {{passive: true}});
 
-        window.addEventListener('mouseup', () => {{ hudDragging = false; isDragging = false; isPanning = false; }});
-        window.addEventListener('mouseleave', () => {{ hudDragging = false; isDragging = false; isPanning = false; }});
-        window.addEventListener('touchend', () => {{ hudDragging = false; isDragging = false; isPanning = false; initialPinchDist = null; }});
+        window.addEventListener('mouseup', () => {{ 
+            hudDragging = false; isDragging = false; isPanning = false; 
+        }});
+        window.addEventListener('mouseleave', () => {{ 
+            hudDragging = false; isDragging = false; isPanning = false; 
+        }});
+        window.addEventListener('touchend', () => {{ 
+            hudDragging = false; isDragging = false; isPanning = false; initialPinchDist = null; 
+        }});
 
         window.addEventListener('mousemove', (e) => {{
-            if (hudDragging) {{ hud.style.left = (e.clientX - hudOffsetX) + 'px'; hud.style.top = (e.clientY - hudOffsetY) + 'px'; hud.style.right = 'auto'; }}
+            if (hudDragging) {{ 
+                hud.style.left = (e.clientX - hudOffsetX) + 'px'; 
+                hud.style.top = (e.clientY - hudOffsetY) + 'px'; 
+                hud.style.right = 'auto'; 
+            }}
         }});
+        
         window.addEventListener('touchmove', (e) => {{
-            if (hudDragging) {{ hud.style.left = (e.touches[0].clientX - hudOffsetX) + 'px'; hud.style.top = (e.touches[0].clientY - hudOffsetY) + 'px'; hud.style.right = 'auto'; }}
+            if (hudDragging) {{ 
+                hud.style.left = (e.touches[0].clientX - hudOffsetX) + 'px'; 
+                hud.style.top = (e.touches[0].clientY - hudOffsetY) + 'px'; 
+                hud.style.right = 'auto'; 
+            }}
         }}, {{passive: true}});
 
         function toggleFreeze() {{
             isFrozen = !isFrozen;
             if(isFrozen) {{
-                hud.style.borderColor = 'gold'; document.getElementById('freeze-status').style.display = 'block'; document.getElementById('export-btn').style.display = 'block';
+                hud.style.borderColor = 'gold'; 
+                document.getElementById('freeze-status').style.display = 'block'; 
+                document.getElementById('export-btn').style.display = 'block';
             }} else {{
-                hud.style.borderColor = 'rgba(255, 255, 255, 0.15)'; document.getElementById('freeze-status').style.display = 'none'; document.getElementById('export-btn').style.display = 'none';
+                hud.style.borderColor = 'rgba(255, 255, 255, 0.15)'; 
+                document.getElementById('freeze-status').style.display = 'none'; 
+                document.getElementById('export-btn').style.display = 'none';
             }}
         }}
 
-        document.addEventListener('dblclick', function(e) {{ if(e.target.closest('#hud')) return; toggleFreeze(); }});
+        document.addEventListener('dblclick', function(e) {{ 
+            if(e.target.closest('#hud')) return; 
+            toggleFreeze(); 
+        }});
 
         let lastTap = 0;
         document.addEventListener('touchend', function(e) {{
             if(e.target.closest('#hud') || hudDragging) return;
-            let currentTime = new Date().getTime(); let tapLength = currentTime - lastTap;
+            let currentTime = new Date().getTime(); 
+            let tapLength = currentTime - lastTap;
             if (tapLength < 400 && tapLength > 0) {{ toggleFreeze(); }}
             lastTap = currentTime;
         }});
@@ -411,14 +462,17 @@ three_js_code = f"""
         document.getElementById('export-btn').addEventListener('click', function() {{
             const blob = new Blob([snapshotData], {{ type: 'text/plain' }});
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url;
+            const a = document.createElement('a'); 
+            a.href = url;
             a.download = 'PigmentSnapshot_' + document.getElementById('hex-code').innerText + '.txt';
-            a.click(); window.URL.revokeObjectURL(url);
+            a.click(); 
+            window.URL.revokeObjectURL(url);
         }});
 
         function processRaycaster(clientX, clientY) {{
             if(isFrozen) return;
-            mouse.x = (clientX / window.innerWidth) * 2 - 1; mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            mouse.x = (clientX / window.innerWidth) * 2 - 1; 
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
             const intersectableObjects = group.children.filter(child => child.material.wireframe !== true);
@@ -428,32 +482,50 @@ three_js_code = f"""
             for(let i = 0; i < intersects.length; i++) {{
                 let pt = intersects[i].point;
                 if(pt.x > 0.001 && pt.y > 0.001 && pt.z > 0.001) continue; 
-                hitPoint = pt; break;
+                hitPoint = pt; 
+                break;
             }}
 
             if(hitPoint) {{
                 let r = Math.sqrt(hitPoint.x*hitPoint.x + hitPoint.y*hitPoint.y + hitPoint.z*hitPoint.z);
-                let cx = Math.cos(customUniforms.uRotX.value), sx = Math.sin(customUniforms.uRotX.value);
-                let cy = Math.cos(customUniforms.uRotY.value), sy = Math.sin(customUniforms.uRotY.value);
+                let cx = Math.cos(customUniforms.uRotX.value);
+                let sx = Math.sin(customUniforms.uRotX.value);
+                let cy = Math.cos(customUniforms.uRotY.value);
+                let sy = Math.sin(customUniforms.uRotY.value);
                 
-                let v1x = cy * hitPoint.x - sy * hitPoint.z; let v1y = hitPoint.y; let v1z = sy * hitPoint.x + cy * hitPoint.z;
+                let v1x = cy * hitPoint.x - sy * hitPoint.z; 
+                let v1y = hitPoint.y; 
+                let v1z = sy * hitPoint.x + cy * hitPoint.z;
+                
                 let spinPos = {{ x: v1x, y: cx * v1y + sx * v1z, z: -sx * v1y + cx * v1z }};
-                
                 let len = Math.sqrt(spinPos.x*spinPos.x + spinPos.y*spinPos.y + spinPos.z*spinPos.z);
                 let n = {{ x: spinPos.x/len, y: spinPos.y/len, z: spinPos.z/len }};
 
-                let wX = Math.pow(Math.abs(n.x), {brilliance}); let wY = Math.pow(Math.abs(n.y), {brilliance}); let wZ = Math.pow(Math.abs(n.z), {brilliance});
-                let tot = wX + wY + wZ; wX /= tot; wY /= tot; wZ /= tot;
+                let wX = Math.pow(Math.abs(n.x), {brilliance}); 
+                let wY = Math.pow(Math.abs(n.y), {brilliance}); 
+                let wZ = Math.pow(Math.abs(n.z), {brilliance});
+                
+                let tot = wX + wY + wZ; 
+                wX /= tot; 
+                wY /= tot; 
+                wZ /= tot;
 
-                let pr = (n.y > 0 ? (wY*100) : 0).toFixed(1); let pc = (n.y <= 0 ? (wY*100) : 0).toFixed(1);
-                let py = (n.x > 0 ? (wX*100) : 0).toFixed(1); let pb = (n.x <= 0 ? (wX*100) : 0).toFixed(1);
-                let pg = (n.z > 0 ? (wZ*100) : 0).toFixed(1); let pm = (n.z <= 0 ? (wZ*100) : 0).toFixed(1);
+                let pr = (n.y > 0 ? (wY*100) : 0).toFixed(1); 
+                let pc = (n.y <= 0 ? (wY*100) : 0).toFixed(1);
+                let py = (n.x > 0 ? (wX*100) : 0).toFixed(1); 
+                let pb = (n.x <= 0 ? (wX*100) : 0).toFixed(1);
+                let pg = (n.z > 0 ? (wZ*100) : 0).toFixed(1); 
+                let pm = (n.z <= 0 ? (wZ*100) : 0).toFixed(1);
 
-                document.getElementById('p-yp').innerText = pr + '%'; document.getElementById('p-yn').innerText = pc + '%';
-                document.getElementById('p-xp').innerText = py + '%'; document.getElementById('p-xn').innerText = pb + '%';
-                document.getElementById('p-zp').innerText = pg + '%'; document.getElementById('p-zn').innerText = pm + '%';
+                document.getElementById('p-yp').innerText = pr + '%'; 
+                document.getElementById('p-yn').innerText = pc + '%';
+                document.getElementById('p-xp').innerText = py + '%'; 
+                document.getElementById('p-xn').innerText = pb + '%';
+                document.getElementById('p-zp').innerText = pg + '%'; 
+                document.getElementById('p-zn').innerText = pm + '%';
 
-                let coreEdge = {shadow_depth} * 0.1; let crustEdge = 1.88 - ({sun_intensity} * 0.15);
+                let coreEdge = {shadow_depth} * 0.1; 
+                let crustEdge = 1.88 - ({sun_intensity} * 0.15);
                 
                 let v1 = {1 if show_core else 0} === 1 ? smoothstep(coreEdge, coreEdge + 1.3, r) : 1.0;
                 let v2 = {1 if show_luma else 0} === 1 ? smoothstep(crustEdge - 0.65, crustEdge - 0.1, r) : 0.0;
@@ -472,8 +544,15 @@ three_js_code = f"""
                 document.getElementById('z-orange').innerText = zOrange + '%';
                 document.getElementById('z-umber').innerText = zUmber + '%';
                 
-                let colorY = n.y > 0 ? {js_yp} : {js_yn}; let colorX = n.x > 0 ? {js_xp} : {js_xn}; let colorZ = n.z > 0 ? {js_zp} : {js_zn};
-                let pureRGB = [ colorX[0]*wX + colorY[0]*wY + colorZ[0]*wZ, colorX[1]*wX + colorY[1]*wY + colorZ[1]*wZ, colorX[2]*wX + colorY[2]*wY + colorZ[2]*wZ ];
+                let colorY = n.y > 0 ? {js_yp} : {js_yn}; 
+                let colorX = n.x > 0 ? {js_xp} : {js_xn}; 
+                let colorZ = n.z > 0 ? {js_zp} : {js_zn};
+                
+                let pureRGB = [ 
+                    colorX[0]*wX + colorY[0]*wY + colorZ[0]*wZ, 
+                    colorX[1]*wX + colorY[1]*wY + colorZ[1]*wZ, 
+                    colorX[2]*wX + colorY[2]*wY + colorZ[2]*wZ 
+                ];
 
                 let fColor = {js_core}; 
                 fColor = mixVec(fColor, pureRGB, v1); 
@@ -481,14 +560,20 @@ three_js_code = f"""
                 fColor = mixVec(fColor, mixVec({js_heat}, pureRGB, 0.65), v3); 
                 fColor = mixVec(fColor, mixVec({js_crust}, pureRGB, 0.4), v4);
                 
-                let rVal = Math.round(fColor[0]*255); let gVal = Math.round(fColor[1]*255); let bVal = Math.round(fColor[2]*255);
+                let rVal = Math.round(fColor[0]*255); 
+                let gVal = Math.round(fColor[1]*255); 
+                let bVal = Math.round(fColor[2]*255);
+                
                 let hexStr = "#" + toHex(rVal) + toHex(gVal) + toHex(bVal);
 
                 document.getElementById('swatch').style.backgroundColor = `rgb(${{rVal}}, ${{gVal}}, ${{bVal}})`;
                 document.getElementById('hex-code').innerText = hexStr;
                 
-                let degX = (customUniforms.uRotX.value * 180 / Math.PI) % 360; let degY = (customUniforms.uRotY.value * 180 / Math.PI) % 360;
-                if (degX < 0) degX += 360; if (degY < 0) degY += 360;
+                let degX = (customUniforms.uRotX.value * 180 / Math.PI) % 360; 
+                let degY = (customUniforms.uRotY.value * 180 / Math.PI) % 360;
+                
+                if (degX < 0) degX += 360; 
+                if (degY < 0) degY += 360;
 
                 let dynExport = "";
                 if ({1 if show_core else 0} === 1) dynExport += `{name_core}: ${{zCore}}%\\n`;
@@ -497,76 +582,140 @@ three_js_code = f"""
                 if ({1 if show_heat else 0} === 1) dynExport += `{name_heat}: ${{zOrange}}%\\n`;
                 if ({1 if show_crust else 0} === 1) dynExport += `{name_crust}: ${{zUmber}}%\\n`;
 
-                snapshotData = `CUSTOM PIGMENT SPHERE SNAPSHOT\\n------------------------------\\nFinal Hex Code:  ${{hexStr}}\\nFinal RGB Value: (${{rVal}}, ${{gVal}}, ${{bVal}})\\n\\nPIGMENT BLEND\\n-------------\\n{name_y_pos}: ${{pr}}%\\n{name_y_neg}: ${{pc}}%\\n{name_x_pos}: ${{py}}%\\n{name_x_neg}: ${{pb}}%\\n{name_z_pos}: ${{pg}}%\\n{name_z_neg}: ${{pm}}%\\n\\nATMOSPHERIC DEPTH\\n-----------------\\n` + dynExport + `\\nRESTORATION COORDINATES\\n-----------------------\\nLatitude:  ${{Math.round(degX)}}\\nLongitude: ${{Math.round(degY)}}\\n`;
+                snapshotData = `CUSTOM PIGMENT SPHERE SNAPSHOT\\n` +
+                    `------------------------------\\n` +
+                    `Final Hex Code:  ${{hexStr}}\\n` +
+                    `Final RGB Value: (${{rVal}}, ${{gVal}}, ${{bVal}})\\n\\n` +
+                    `PIGMENT BLEND\\n` +
+                    `-------------\\n` +
+                    `{name_y_pos}: ${{pr}}%\\n` +
+                    `{name_y_neg}: ${{pc}}%\\n` +
+                    `{name_x_pos}: ${{py}}%\\n` +
+                    `{name_x_neg}: ${{pb}}%\\n` +
+                    `{name_z_pos}: ${{pg}}%\\n` +
+                    `{name_z_neg}: ${{pm}}%\\n\\n` +
+                    `ATMOSPHERIC DEPTH\\n` +
+                    `-----------------\\n` + dynExport + `\\n` +
+                    `RESTORATION COORDINATES\\n` +
+                    `-----------------------\\n` +
+                    `Latitude:  ${{Math.round(degX)}}\\n` +
+                    `Longitude: ${{Math.round(degY)}}\\n`;
+                    
             }} else {{
                 document.querySelectorAll('.row span:nth-child(2)').forEach(el => el.innerText = '0%');
-                document.getElementById('swatch').style.backgroundColor = '#000'; document.getElementById('hex-code').innerText = '-------'; snapshotData = "";
+                document.getElementById('swatch').style.backgroundColor = '#000'; 
+                document.getElementById('hex-code').innerText = '-------'; 
+                snapshotData = "";
             }}
         }}
 
         document.addEventListener('mousedown', function(e) {{
             if(e.target.closest('#hud')) return;
-            if (e.button === 2) {{ isPanning = true; }} else {{ isDragging = true; }}
+            if (e.button === 2) {{ 
+                isPanning = true; 
+            }} else {{ 
+                isDragging = true; 
+            }}
             lastMousePosition = {{ x: e.clientX, y: e.clientY }};
         }});
         
         document.addEventListener('mousemove', function(e) {{
             if(isDragging && !hudDragging) {{
                 let deltaMove = {{ x: e.clientX - lastMousePosition.x, y: e.clientY - lastMousePosition.y }};
-                customUniforms.uRotY.value += deltaMove.x * 0.01; customUniforms.uRotX.value += deltaMove.y * 0.01;
+                customUniforms.uRotY.value += deltaMove.x * 0.01; 
+                customUniforms.uRotX.value += deltaMove.y * 0.01;
                 lastMousePosition = {{ x: e.clientX, y: e.clientY }};
+                
             }} else if (isPanning && !hudDragging) {{
-                let dx = e.clientX - lastMousePosition.x; let dy = e.clientY - lastMousePosition.y;
+                let dx = e.clientX - lastMousePosition.x; 
+                let dy = e.clientY - lastMousePosition.y;
                 let panSpeed = currentZoom * 0.0015;
+                
                 let camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
                 let camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-                panTarget.add(camRight.multiplyScalar(-dx * panSpeed)); panTarget.add(camUp.multiplyScalar(dy * panSpeed));
-                updateCamera(); lastMousePosition = {{ x: e.clientX, y: e.clientY }};
+                
+                panTarget.add(camRight.multiplyScalar(-dx * panSpeed)); 
+                panTarget.add(camUp.multiplyScalar(dy * panSpeed));
+                
+                updateCamera(); 
+                lastMousePosition = {{ x: e.clientX, y: e.clientY }};
             }}
             processRaycaster(e.clientX, e.clientY);
         }});
 
         document.addEventListener('wheel', function(e) {{
-            if(e.target.closest('#hud')) return; currentZoom += e.deltaY * 0.01; updateCamera();
+            if(e.target.closest('#hud')) return; 
+            currentZoom += e.deltaY * 0.01; 
+            updateCamera();
         }});
 
         document.addEventListener('touchstart', function(e) {{
             if(e.target.closest('#hud')) return;
             if (e.touches.length === 1) {{
-                isDragging = true; lastMousePosition = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+                isDragging = true; 
+                lastMousePosition = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
             }} else if (e.touches.length === 2) {{
-                isDragging = false; let dx = e.touches[0].clientX - e.touches[1].clientX; let dy = e.touches[0].clientY - e.touches[1].clientY;
+                isDragging = false; 
+                let dx = e.touches[0].clientX - e.touches[1].clientX; 
+                let dy = e.touches[0].clientY - e.touches[1].clientY;
                 initialPinchDist = Math.sqrt(dx*dx + dy*dy);
-                lastPinchMidpoint = {{ x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 }};
+                lastPinchMidpoint = {{ 
+                    x: (e.touches[0].clientX + e.touches[1].clientX)/2, 
+                    y: (e.touches[0].clientY + e.touches[1].clientY)/2 
+                }};
             }}
         }}, {{passive: true}});
 
         document.addEventListener('touchmove', function(e) {{
             if(e.target.closest('#hud') || hudDragging) return;
+            
             if (e.touches.length === 1 && isDragging) {{
-                let deltaMove = {{ x: e.touches[0].clientX - lastMousePosition.x, y: e.touches[0].clientY - lastMousePosition.y }};
-                customUniforms.uRotY.value += deltaMove.x * 0.01; customUniforms.uRotX.value += deltaMove.y * 0.01;
+                let deltaMove = {{ 
+                    x: e.touches[0].clientX - lastMousePosition.x, 
+                    y: e.touches[0].clientY - lastMousePosition.y 
+                }};
+                customUniforms.uRotY.value += deltaMove.x * 0.01; 
+                customUniforms.uRotX.value += deltaMove.y * 0.01;
                 lastMousePosition = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
                 processRaycaster(e.touches[0].clientX, e.touches[0].clientY);
+                
             }} else if (e.touches.length === 2 && initialPinchDist) {{
-                let dx = e.touches[0].clientX - e.touches[1].clientX; let dy = e.touches[0].clientY - e.touches[1].clientY;
-                let dist = Math.sqrt(dx*dx + dy*dy); let zoomDelta = initialPinchDist - dist;
-                currentZoom += zoomDelta * 0.02; initialPinchDist = dist;
-                let midX = (e.touches[0].clientX + e.touches[1].clientX)/2; let midY = (e.touches[0].clientY + e.touches[1].clientY)/2;
-                let panDx = midX - lastPinchMidpoint.x; let panDy = midY - lastPinchMidpoint.y;
+                let dx = e.touches[0].clientX - e.touches[1].clientX; 
+                let dy = e.touches[0].clientY - e.touches[1].clientY;
+                let dist = Math.sqrt(dx*dx + dy*dy); 
+                let zoomDelta = initialPinchDist - dist;
+                
+                currentZoom += zoomDelta * 0.02; 
+                initialPinchDist = dist;
+                
+                let midX = (e.touches[0].clientX + e.touches[1].clientX)/2; 
+                let midY = (e.touches[0].clientY + e.touches[1].clientY)/2;
+                let panDx = midX - lastPinchMidpoint.x; 
+                let panDy = midY - lastPinchMidpoint.y;
                 let panSpeed = currentZoom * 0.002;
+                
                 let camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
                 let camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-                panTarget.add(camRight.multiplyScalar(-panDx * panSpeed)); panTarget.add(camUp.multiplyScalar(panDy * panSpeed));
-                lastPinchMidpoint = {{ x: midX, y: midY }}; updateCamera();
+                
+                panTarget.add(camRight.multiplyScalar(-panDx * panSpeed)); 
+                panTarget.add(camUp.multiplyScalar(panDy * panSpeed));
+                lastPinchMidpoint = {{ x: midX, y: midY }}; 
+                
+                updateCamera();
             }}
         }}, {{passive: true}});
 
         window.addEventListener('resize', () => {{
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }});
 
-        function animate() {{ requestAnimationFrame(animate); renderer.render(scene, camera); }}
+        function animate() {{ 
+            requestAnimationFrame(animate); 
+            renderer.render(scene, camera); 
+        }}
+        
         animate();
     </script>
 </body>
