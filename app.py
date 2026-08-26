@@ -512,7 +512,33 @@ three_js_code = f"""
                 let degX = (customUniforms.uRotX.value * 180 / Math.PI) % 360; let degY = (customUniforms.uRotY.value * 180 / Math.PI) % 360;
                 if (degX < 0) degX += 360; if (degY < 0) degY += 360;
 
-                snapshotData = `CUSTOM PIGMENT SPHERE SNAPSHOT\\n------------------------------\\nFinal Hex Code:  ${{hexStr}}\\nFinal RGB Value: (${{rVal}}, ${{gVal}}, ${{bVal}})\\n\\nPIGMENT BLEND\\n-------------\\n{name_y_pos}: ${{pr}}%\\n{name_y_neg}: ${{pc}}%\\n{name_x_pos}: ${{py}}%\\n{name_x_neg}: ${{pb}}%\\n{name_z_pos}: ${{pg}}%\\n{name_z_neg}: ${{pm}}%\\n\\nATMOSPHERIC DEPTH\\n-----------------\\n{name_core}: ${{zCore}}%\\nPure Mantle: ${{zPure}}%\\n{name_luma}: ${{zWhite}}%\\n{name_heat}: ${{zOrange}}%\\n{name_crust}: ${{zUmber}}%\\n\\nRESTORATION COORDINATES\\n-----------------------\\nLatitude:  ${{Math.round(degX)}}\\nLongitude: ${{Math.round(degY)}}\\n`;
+                snapshotData = `CUSTOM PIGMENT SPHERE SNAPSHOT
+------------------------------
+Final Hex Code:  ${{hexStr}}
+Final RGB Value: (${{rVal}}, ${{gVal}}, ${{bVal}})
+
+PIGMENT BLEND
+-------------
+{name_y_pos}: ${{pr}}%
+{name_y_neg}: ${{pc}}%
+{name_x_pos}: ${{py}}%
+{name_x_neg}: ${{pb}}%
+{name_z_pos}: ${{pg}}%
+{name_z_neg}: ${{pm}}%
+
+ATMOSPHERIC DEPTH
+-----------------
+{name_core}: ${{zCore}}%
+Pure Mantle: ${{zPure}}%
+{name_luma}: ${{zWhite}}%
+{name_heat}: ${{zOrange}}%
+{name_crust}: ${{zUmber}}%
+
+RESTORATION COORDINATES
+-----------------------
+Latitude:  ${{Math.round(degX)}}
+Longitude: ${{Math.round(degY)}}
+`;
             }} else {{
                 document.querySelectorAll('.row span:nth-child(2)').forEach(el => el.innerText = '0%');
                 document.getElementById('swatch').style.backgroundColor = '#000'; document.getElementById('hex-code').innerText = '-------'; snapshotData = "";
@@ -598,3 +624,6 @@ three_js_code = f"""
     </script>
 </body>
 </html>
+"""
+
+components.html(three_js_code, height=900)
