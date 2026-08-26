@@ -4,7 +4,7 @@ import math
 import json
 
 # 1. Page Configuration MUST be first
-st.set_page_config(page_title="Color Sphere - Custom Pigments", layout="wide")
+st.set_page_config(page_title="Color Sphere - True Pigments", layout="wide")
 
 st.markdown("""
     <style>
@@ -12,31 +12,27 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- HELPER FUNCTION: Convert Hex to GLSL & JS Vectors ---
 def hex_to_vectors(hex_str):
     hex_str = hex_str.lstrip('#')
     r, g, b = int(hex_str[0:2], 16)/255.0, int(hex_str[2:4], 16)/255.0, int(hex_str[4:6], 16)/255.0
     return f"vec3({r:.3f}, {g:.3f}, {b:.3f})", f"[{r:.3f}, {g:.3f}, {b:.3f}]"
 
-# --- SESSION STATE INITIALIZATION ---
+# --- SESSION STATE INITIALIZATION (Pre-loaded with your scanned swatches) ---
 default_state = {
-    "name_y_pos": "Red", "hex_y_pos": "#FF0000",
-    "name_x_pos": "Yellow", "hex_x_pos": "#FFFF00",
-    "name_z_pos": "Green", "hex_z_pos": "#00FF00",
-    "name_y_neg": "Cyan", "hex_y_neg": "#00FFFF",
-    "name_x_neg": "Blue", "hex_x_neg": "#0000FF",
-    "name_z_neg": "Magenta", "hex_z_neg": "#FF00FF",
+    "name_y_pos": "Red (PR202/PR254)", "yp_mass": "#B50027", "yp_mid": "#DB295B", "yp_wash": "#E39FBA",
+    "name_x_pos": "Yellow (PY184)", "xp_mass": "#F2EF00", "xp_mid": "#F7F550", "xp_wash": "#FCFBA1",
+    "name_z_pos": "Green (PG7/PY74)", "zp_mass": "#1B8724", "zp_mid": "#72C824", "zp_wash": "#B5E265",
+    "name_y_neg": "Cyan (PB15/PG7)", "yn_mass": "#20415C", "yn_mid": "#3A7CA5", "yn_wash": "#6AB6CC",
+    "name_x_neg": "Blue (PB15:2)", "xn_mass": "#1E154B", "xn_mid": "#1135A2", "xn_wash": "#8AB2D7",
+    "name_z_neg": "Magenta (PR202)", "zn_mass": "#701B2E", "zn_mid": "#B80F62", "zn_wash": "#DD9BB9",
     "show_abyss": True, "name_abyss": "Indigo Abyss", "hex_abyss": "#080414",
     "show_core": True, "name_core": "Violet Core", "hex_core": "#59268C",
     "show_heat": True, "name_heat": "Orange Undercrust", "hex_heat": "#FF6600",
     "show_luma": True, "name_luma": "White Luma", "hex_luma": "#F2F2F2",
     "show_crust": True, "name_crust": "Umber Crust", "hex_crust": "#26140D",
     "show_grid": False, "brilliance": 1.4, "rot_x": 0, "rot_y": 0,
-    "rad_abyss": 0.1, "fade_abyss": 0.5,
-    "rad_core": 0.5, "fade_core": 0.7,
-    "rad_luma": 1.2, "fade_luma": 0.4,
-    "rad_heat": 1.5, "fade_heat": 0.3,
-    "rad_crust": 1.8, "fade_crust": 0.2
+    "rad_abyss": 0.1, "fade_abyss": 0.5, "rad_core": 0.5, "fade_core": 0.7,
+    "rad_luma": 1.2, "fade_luma": 0.4, "rad_heat": 1.5, "fade_heat": 0.3, "rad_crust": 1.8, "fade_crust": 0.2
 }
 
 for k, v in default_state.items():
@@ -49,36 +45,12 @@ with st.sidebar:
     
     with st.expander("📖 About & Guide", expanded=False):
         st.markdown("""
-        **Built Strictly for Physical Artists**
-        In digital art, pure white and flat black are necessary pixels. In physical art, they are redundant. Every painter already knows what the blank white of their paper looks like, and they know what a tube of flat black looks like. You do not need a visualizer to imagine them. 
+        **The True Pigment Architecture**
+        Physical paints possess a **mass tone** (thick application), a **mid-tone**, and an **undertone/wash** (diluted). A single tube of paint is effectively a living gradient. 
         
-        Because of this, the Color Sphere deliberately avoids rendering pure white or flat black. Instead, it is designed to explore the profound, rich spectrum *between* the extremes. It proves you can achieve luminous brightness and cavernous depth using only pure pigments, without ever relying on dulling agents.
-        
-        **The Philosophy: Brilliant Depth, Zero Mud**
-        For an artist, the ultimate goal is palette accessibility—using the most efficient range of pigments to create illuminating, dramatic images without them turning muddy. By visually mapping out your pigments, you can intentionally avoid mixing exact opposites (like pure red and cyan), ensuring your mixes remain clean and vibrant.
-
-        **The 6+4 Minimalist Palette**
-        You can achieve a staggering gamut of color with just 6 to 10 specific pigments:
-        * **The 6 Anchors:** Red, Green, Blue (RGB) and Cyan, Magenta, Yellow (CMY). 
-        * **The Atmospheric Depth (+4):** To complete the universe without black or white paint, this tool introduces an Indigo Abyss (near-black deep depth), Violet Core (rich shadow), Orange Undercrust (brilliant warmth), and Burnt Umber Crust (resonant earth tones). 
-        
-        **⚠️ Disclaimer: The Reality of Physical Pigment**
-        Digital math provides a flawless theoretical framework, but physical media is delightfully unpredictable. Real paints possess a **mass tone** (how they look applied thickly) and an **undertone** (how they look washed out). As seen with heavy violets or deep blues, a thick application can easily masquerade as pitch black before revealing its true hue. Furthermore, variables like pigment density, granulation, and the medium itself will alter the final mix. 
-        
-        Use this sphere as a theoretical compass for color harmony and proportion, but always let the physical paint have the final say on the canvas.
-        
-        **How to Use This Tool**
-        * **Map Your Inks:** Replace the default digital colors with the exact hex codes of the physical paints or inks you own. 
-        * **Test Limited Palettes:** If you only own three primary colors, input them across the six poles to see the exact gamut of what those three colors can achieve.
-        * **Toggle the Atmosphere:** Don't have Burnt Umber or Violet? Turn them off in the Atmosphere tab, or use the provided mixing recipes.
-        * **Extract the Formula:** Spin the sphere to explore. Double-click (or double-tap on iPad) to freeze it. The Data HUD will reveal the exact percentage of each pigment required to mix that specific hue on your physical palette.
-        
-        ---
-        *Questions or feedback? Please contact the original poster of this tool!*
+        This sphere maps that physical reality in 3D space. The deeper into the core you probe, the heavier the mass tone. The closer to the surface, the more diluted the wash. This mimics the behavior of physical paint interacting with light and water, long before it hits the atmospheric extremes of the Indigo Abyss or the White Luma.
         """)
 
-    st.markdown("[Find Pigment Hex Codes Here](https://inkswatch.com/)")
-    
     with st.expander("💾 Save / Load Workspace", expanded=False):
         uploaded_file = st.file_uploader("Load Palette (.json)", type=["json"], key="json_uploader")
         if uploaded_file is not None:
@@ -95,32 +67,53 @@ with st.sidebar:
                     st.error("Invalid workspace file.")
 
         export_data = {k: st.session_state[k] for k in default_state.keys()}
-        st.download_button(
-            label="Export Workspace to JSON",
-            data=json.dumps(export_data, indent=4), file_name="my_color_sphere_workspace.json",
-            mime="application/json", key="json_downloader"
-        )
+        st.download_button(label="Export Workspace to JSON", data=json.dumps(export_data, indent=4), file_name="my_color_sphere_workspace.json", mime="application/json", key="json_downloader")
     
     with st.expander("🎨 6-Pole Anchor Pigments", expanded=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            name_y_pos = st.text_input("Top (Y+)", key="name_y_pos")
-            hex_y_pos = st.color_picker("Y+ Color", key="hex_y_pos")
-            name_x_pos = st.text_input("East (X+)", key="name_x_pos")
-            hex_x_pos = st.color_picker("X+ Color", key="hex_x_pos")
-            name_z_pos = st.text_input("Front (Z+)", key="name_z_pos")
-            hex_z_pos = st.color_picker("Z+ Color", key="hex_z_pos")
-        with col2:
-            name_y_neg = st.text_input("Bottom (Y-)", key="name_y_neg")
-            hex_y_neg = st.color_picker("Y- Color", key="hex_y_neg")
-            name_x_neg = st.text_input("West (X-)", key="name_x_neg")
-            hex_x_neg = st.color_picker("X- Color", key="hex_x_neg")
-            name_z_neg = st.text_input("Back (Z-)", key="name_z_neg")
-            hex_z_neg = st.color_picker("Z- Color", key="hex_z_neg")
+        st.markdown("*Input the 3 stages of your physical paint.*")
+        
+        name_y_pos = st.text_input("Top (Y+)", key="name_y_pos")
+        c1, c2, c3 = st.columns(3)
+        yp_mass = c1.color_picker("Mass", key="yp_mass")
+        yp_mid = c2.color_picker("Mid", key="yp_mid")
+        yp_wash = c3.color_picker("Wash", key="yp_wash")
+        st.markdown("---")
+        
+        name_y_neg = st.text_input("Bottom (Y-)", key="name_y_neg")
+        c1, c2, c3 = st.columns(3)
+        yn_mass = c1.color_picker("Mass", key="yn_mass")
+        yn_mid = c2.color_picker("Mid", key="yn_mid")
+        yn_wash = c3.color_picker("Wash", key="yn_wash")
+        st.markdown("---")
+        
+        name_x_pos = st.text_input("East (X+)", key="name_x_pos")
+        c1, c2, c3 = st.columns(3)
+        xp_mass = c1.color_picker("Mass", key="xp_mass")
+        xp_mid = c2.color_picker("Mid", key="xp_mid")
+        xp_wash = c3.color_picker("Wash", key="xp_wash")
+        st.markdown("---")
+        
+        name_x_neg = st.text_input("West (X-)", key="name_x_neg")
+        c1, c2, c3 = st.columns(3)
+        xn_mass = c1.color_picker("Mass", key="xn_mass")
+        xn_mid = c2.color_picker("Mid", key="xn_mid")
+        xn_wash = c3.color_picker("Wash", key="xn_wash")
+        st.markdown("---")
+        
+        name_z_pos = st.text_input("Front (Z+)", key="name_z_pos")
+        c1, c2, c3 = st.columns(3)
+        zp_mass = c1.color_picker("Mass", key="zp_mass")
+        zp_mid = c2.color_picker("Mid", key="zp_mid")
+        zp_wash = c3.color_picker("Wash", key="zp_wash")
+        st.markdown("---")
+        
+        name_z_neg = st.text_input("Back (Z-)", key="name_z_neg")
+        c1, c2, c3 = st.columns(3)
+        zn_mass = c1.color_picker("Mass", key="zn_mass")
+        zn_mid = c2.color_picker("Mid", key="zn_mid")
+        zn_wash = c3.color_picker("Wash", key="zn_wash")
 
     with st.expander("🌫️ Atmospheric Layers", expanded=False):
-        st.markdown("*Toggle atmospheric effects. Mix them if you don't own them!*")
-        st.markdown("- **Abyss:** Dark Navy / Deep Indigo\n- **Violet:** Mix Magenta + Cyan\n- **Orange:** Mix Red/Magenta + Yellow\n- **Burnt Umber:** Mix Orange + Blue/Cyan\n- **Luma:** The raw white of the paper")
         col3, col4 = st.columns(2)
         with col3:
             show_abyss = st.toggle("Enable Abyss", key="show_abyss")
@@ -141,16 +134,14 @@ with st.sidebar:
             hex_crust = st.color_picker("Crust Color", key="hex_crust")
 
     with st.expander("🎛️ Atmosphere Fine-Tuning", expanded=False):
-        st.markdown("*Adjust the Start Radius (0.0 = Center, 2.0 = Surface) and the Soft Fade distance of each layer.*")
         show_grid = st.toggle("Show Wireframe Grid", key="show_grid")
         brilliance = st.slider("Color Overlap Brilliance", 0.2, 5.0, key="brilliance")
-        
         st.markdown("---")
         if show_abyss:
             st.markdown(f"**{name_abyss}**")
             c1, c2 = st.columns(2)
-            rad_abyss = c1.slider("Start Radius", 0.0, 2.0, key="rad_abyss", help="How far from the center the Abyss reaches before fading.")
-            fade_abyss = c2.slider("Soft Fade", 0.0, 2.0, key="fade_abyss", help="How smoothly it blends into the next layer.")
+            rad_abyss = c1.slider("Start Radius", 0.0, 2.0, key="rad_abyss")
+            fade_abyss = c2.slider("Soft Fade", 0.0, 2.0, key="fade_abyss")
         if show_core:
             st.markdown(f"**{name_core}**")
             c1, c2 = st.columns(2)
@@ -173,17 +164,16 @@ with st.sidebar:
             fade_crust = c2.slider("Soft Fade", 0.0, 2.0, key="fade_crust")
     
     with st.expander("🔄 Rotation Math", expanded=False):
-        st.markdown("*Use mouse-drag on canvas for fluid rotation.*")
         rot_x = st.slider("Rotate Latitude", 0, 360, key="rot_x")
         rot_y = st.slider("Rotate Longitude", 0, 360, key="rot_y")
 
-# Pre-calculate all vectors for injection
-gl_yp, js_yp = hex_to_vectors(hex_y_pos)
-gl_yn, js_yn = hex_to_vectors(hex_y_neg)
-gl_xp, js_xp = hex_to_vectors(hex_x_pos)
-gl_xn, js_xn = hex_to_vectors(hex_x_neg)
-gl_zp, js_zp = hex_to_vectors(hex_z_pos)
-gl_zn, js_zn = hex_to_vectors(hex_z_neg)
+# Pre-calculate all 18 anchor vectors
+gl_yp_ma, js_yp_ma = hex_to_vectors(yp_mass); gl_yp_mi, js_yp_mi = hex_to_vectors(yp_mid); gl_yp_wa, js_yp_wa = hex_to_vectors(yp_wash)
+gl_yn_ma, js_yn_ma = hex_to_vectors(yn_mass); gl_yn_mi, js_yn_mi = hex_to_vectors(yn_mid); gl_yn_wa, js_yn_wa = hex_to_vectors(yn_wash)
+gl_xp_ma, js_xp_ma = hex_to_vectors(xp_mass); gl_xp_mi, js_xp_mi = hex_to_vectors(xp_mid); gl_xp_wa, js_xp_wa = hex_to_vectors(xp_wash)
+gl_xn_ma, js_xn_ma = hex_to_vectors(xn_mass); gl_xn_mi, js_xn_mi = hex_to_vectors(xn_mid); gl_xn_wa, js_xn_wa = hex_to_vectors(xn_wash)
+gl_zp_ma, js_zp_ma = hex_to_vectors(zp_mass); gl_zp_mi, js_zp_mi = hex_to_vectors(zp_mid); gl_zp_wa, js_zp_wa = hex_to_vectors(zp_wash)
+gl_zn_ma, js_zn_ma = hex_to_vectors(zn_mass); gl_zn_mi, js_zn_mi = hex_to_vectors(zn_mid); gl_zn_wa, js_zn_wa = hex_to_vectors(zn_wash)
 
 gl_abyss, js_abyss = hex_to_vectors(hex_abyss)
 gl_core, js_core = hex_to_vectors(hex_core)
@@ -194,7 +184,6 @@ gl_crust, js_crust = hex_to_vectors(hex_crust)
 rad_x = rot_x * (math.pi / 180)
 rad_y = rot_y * (math.pi / 180)
 
-# Set defaults to 0 if a layer is toggled off, to prevent JS/GLSL math errors
 r_ab, f_ab = (rad_abyss, fade_abyss) if show_abyss else (0.0, 0.0)
 r_co, f_co = (rad_core, fade_core) if show_core else (0.0, 0.0)
 r_lu, f_lu = (rad_luma, fade_luma) if show_luma else (0.0, 0.0)
@@ -277,10 +266,21 @@ three_js_code = f"""
                 varying vec3 vPos;
                 mat3 rx(float a) {{ float s=sin(a), c=cos(a); return mat3(1.,0.,0.,0.,c,-s,0.,s,c); }}
                 mat3 ry(float a) {{ float s=sin(a), c=cos(a); return mat3(c,0.,s,0.,1.,0.,-s,0.,c); }}
+                
+                vec3 getDynamicColor(vec3 mass, vec3 mid, vec3 wash, float r) {{
+                    float t = clamp(r / 2.0, 0.0, 1.0);
+                    if (t < 0.5) {{ return mix(mass, mid, t * 2.0); }} 
+                    else {{ return mix(mid, wash, (t - 0.5) * 2.0); }}
+                }}
+                
                 void main() {{
                     if(vPos.x > 0.001 && vPos.y > 0.001 && vPos.z > 0.001) discard;
                     float r = length(vPos); vec3 n = normalize(rx(uRotX) * ry(uRotY) * vPos);
-                    vec3 cY = n.y > 0. ? {gl_yp} : {gl_yn}; vec3 cX = n.x > 0. ? {gl_xp} : {gl_xn}; vec3 cZ = n.z > 0. ? {gl_zp} : {gl_zn};
+                    
+                    vec3 cY = n.y > 0. ? getDynamicColor({gl_yp_ma}, {gl_yp_mi}, {gl_yp_wa}, r) : getDynamicColor({gl_yn_ma}, {gl_yn_mi}, {gl_yn_wa}, r);
+                    vec3 cX = n.x > 0. ? getDynamicColor({gl_xp_ma}, {gl_xp_mi}, {gl_xp_wa}, r) : getDynamicColor({gl_xn_ma}, {gl_xn_mi}, {gl_xn_wa}, r);
+                    vec3 cZ = n.z > 0. ? getDynamicColor({gl_zp_ma}, {gl_zp_mi}, {gl_zp_wa}, r) : getDynamicColor({gl_zn_ma}, {gl_zn_mi}, {gl_zn_wa}, r);
+                    
                     float wX = pow(abs(n.x), uBrilliance), wY = pow(abs(n.y), uBrilliance), wZ = pow(abs(n.z), uBrilliance);
                     float tot = wX + wY + wZ; vec3 pC = cX*(wX/tot) + cY*(wY/tot) + cZ*(wZ/tot);
                     
@@ -322,6 +322,12 @@ three_js_code = f"""
         function sstep(min, max, val) {{ let x = Math.max(0, Math.min(1, (val-min)/(max-min))); return x*x*(3-2*x); }}
         function mVec(v1, v2, a) {{ return [v1[0]*(1-a)+v2[0]*a, v1[1]*(1-a)+v2[1]*a, v1[2]*(1-a)+v2[2]*a]; }}
         const tHex = (c) => c.toString(16).padStart(2,'0').toUpperCase();
+        
+        function getJSColor(mass, mid, wash, r) {{
+            let t = Math.max(0, Math.min(1, r / 2.0));
+            if (t < 0.5) return mVec(mass, mid, t * 2.0);
+            return mVec(mid, wash, (t - 0.5) * 2.0);
+        }}
 
         let isDrag=false, isPan=false, isFroz=false, lastMouse={{x:0,y:0}}, snapData="", iDist=null, lMid={{x:0,y:0}}, hDrag=false, hOx=0, hOy=0;
         const hud=document.getElementById('hud'), hHead=document.getElementById('hud-header'), hCont=document.getElementById('hud-content'), hTog=document.getElementById('hud-toggle');
@@ -373,7 +379,10 @@ three_js_code = f"""
                 document.getElementById('z-abyss').innerText=zA+'%'; document.getElementById('z-core').innerText=zC+'%'; document.getElementById('z-pure').innerText=zP+'%';
                 document.getElementById('z-white').innerText=zW+'%'; document.getElementById('z-orange').innerText=zO+'%'; document.getElementById('z-umber').innerText=zU+'%';
                 
-                let cY=n.y>0?{js_yp}:{js_yn}, cX=n.x>0?{js_xp}:{js_xn}, cZ=n.z>0?{js_zp}:{js_zn};
+                let cY = n.y > 0. ? getJSColor({js_yp_ma}, {js_yp_mi}, {js_yp_wa}, r) : getJSColor({js_yn_ma}, {js_yn_mi}, {js_yn_wa}, r);
+                let cX = n.x > 0. ? getJSColor({js_xp_ma}, {js_xp_mi}, {js_xp_wa}, r) : getJSColor({js_xn_ma}, {js_xn_mi}, {js_xn_wa}, r);
+                let cZ = n.z > 0. ? getJSColor({js_zp_ma}, {js_zp_mi}, {js_zp_wa}, r) : getJSColor({js_zn_ma}, {js_zn_mi}, {js_zn_wa}, r);
+                
                 let pRGB = [ cX[0]*wX+cY[0]*wY+cZ[0]*wZ, cX[1]*wX+cY[1]*wY+cZ[1]*wZ, cX[2]*wX+cY[2]*wY+cZ[2]*wZ ];
                 let fC = {js_abyss}; fC=mVec(fC, {js_core}, v0); fC=mVec(fC, pRGB, v1); fC=mVec(fC, mVec(pRGB, {js_luma}, 0.6), v2); fC=mVec(fC, mVec({js_heat}, pRGB, 0.65), v3); fC=mVec(fC, mVec({js_crust}, pRGB, 0.4), v4);
                 let rV=Math.round(fC[0]*255), gV=Math.round(fC[1]*255), bV=Math.round(fC[2]*255); let hS="#"+tHex(rV)+tHex(gV)+tHex(bV);
