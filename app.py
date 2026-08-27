@@ -30,16 +30,16 @@ default_state = {
     "show_heat": True, "name_heat": "Orange Undercrust", "hex_heat": "#FF6600",
     "show_luma": True, "name_luma": "White Luma", "hex_luma": "#F2F2F2",
     "show_crust": True, "name_crust": "Umber Crust", "hex_crust": "#26140D",
-    "show_grid": False, "brilliance": 1.4, "rot_x": 0, "rot_y": 0,
+    "show_grid": False, "brilliance": 1.4, "rot_x": 146, "rot_y": 315,
     
     # Planetary Strata Defaults
-    "rad_abyss": 0.0, "fade_abyss": 0.2, "mix_abyss": 0.8,
-    "rad_core": 0.2, "fade_core": 0.2, "mix_core": 0.5,
-    "mass_start": 0.4, "mass_fade": 0.2,
-    "wash_start": 1.2, "wash_fade": 0.2,
-    "rad_luma": 1.4, "fade_luma": 0.2, "mix_luma": 0.5,
-    "rad_heat": 1.6, "fade_heat": 0.2, "mix_heat": 0.5,
-    "rad_crust": 1.8, "fade_crust": 0.2, "mix_crust": 0.5
+    "rad_abyss": 0.0, "fade_abyss": 0.4, "mix_abyss": 0.5,
+    "rad_core": 0.2, "fade_core": 0.4, "mix_core": 0.5,
+    "mass_start": 0.4, "mass_fade": 0.4,
+    "wash_start": 1.2, "wash_fade": 0.4,
+    "rad_luma": 1.4, "fade_luma": 0.4, "mix_luma": 0.5,
+    "rad_heat": 1.6, "fade_heat": 0.39, "mix_heat": 0.5,
+    "rad_crust": 1.8, "fade_crust": 0.4, "mix_crust": 0.5
 }
 
 for k, v in default_state.items():
@@ -156,7 +156,7 @@ with st.sidebar:
             st.markdown(f"**{name_abyss}**")
             c1, c2, c3 = st.columns(3)
             rad_abyss = c1.slider("Boundary", 0.0, 2.0, key="rad_abyss", step=0.01, help="The specific point where this layer stops.")
-            fade_abyss = c2.slider("Fade", 0.0, 2.0, key="fade_abyss", step=0.01, help="How softly it bleeds into the next layer.")
+            fade_abyss = c1.slider("Fade", 0.0, 2.0, key="fade_abyss", step=0.01, help="How softly it bleeds into the next layer.")
             mix_abyss = c3.slider("Midtone Mix", 0.0, 1.0, key="mix_abyss", step=0.01, help="0.0 = Pure Midtone color. 1.0 = Pure Abyss color.")
         if show_core:
             st.markdown(f"**{name_core}**")
