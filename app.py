@@ -19,6 +19,7 @@ def hex_to_vectors(hex_str):
 
 # --- SESSION STATE INITIALIZATION ---
 default_state = {
+    "workspace_name": "Default Studio",
     "name_y_pos": "Red (PR202/PR254)", "yp_mass": "#B50027", "yp_mid": "#DB295B", "yp_wash": "#E39FBA",
     "name_x_pos": "Yellow (PY184)", "xp_mass": "#F2EF00", "xp_mid": "#F7F550", "xp_wash": "#FCFBA1",
     "name_z_pos": "Green (PG7/PY74)", "zp_mass": "#1B8724", "zp_mid": "#72C824", "zp_wash": "#B5E265",
@@ -71,14 +72,15 @@ with st.sidebar:
                 try:
                     data = json.load(uploaded_file)
                     for k in default_state.keys():
-                        if k in data:
+                        if k in data and k != "workspace_name":
                             st.session_state[k] = data[k]
+                    st.session_state["workspace_name"] = uploaded_file.name
                     st.session_state["last_loaded_file"] = file_id
                     st.rerun() 
                 except Exception as e:
                     st.error("Invalid workspace file.")
 
-        export_data = {k: st.session_state[k] for k in default_state.keys()}
+        export_data = {k: st.session_state[k] for k in default_state.keys() if k != "workspace_name"}
         st.download_button(label="Export Workspace to JSON", data=json.dumps(export_data, indent=4), file_name="my_color_sphere_workspace.json", mime="application/json", key="json_downloader", help="Download your current colors and slider settings to your computer.")
     
     with st.expander("🎨 6-Pole Anchor Pigments", expanded=True):
@@ -156,7 +158,7 @@ with st.sidebar:
             st.markdown(f"**{name_abyss}**")
             c1, c2, c3 = st.columns(3)
             rad_abyss = c1.slider("Boundary", 0.0, 2.0, key="rad_abyss", step=0.01, help="The specific point where this layer stops.")
-            fade_abyss = c1.slider("Fade", 0.0, 2.0, key="fade_abyss", step=0.01, help="How softly it bleeds into the next layer.")
+            fade_abyss = c2.slider("Fade", 0.0, 2.0, key="fade_abyss", step=0.01, help="How softly it bleeds into the next layer.")
             mix_abyss = c3.slider("Midtone Mix", 0.0, 1.0, key="mix_abyss", step=0.01, help="0.0 = Pure Midtone color. 1.0 = Pure Abyss color.")
         if show_core:
             st.markdown(f"**{name_core}**")
@@ -228,6 +230,8 @@ mix_lu = st.session_state["mix_luma"] if show_luma else 0.0
 mix_he = st.session_state["mix_heat"] if show_heat else 0.0
 mix_cr = st.session_state["mix_crust"] if show_crust else 0.0
 
+workspace_name = st.session_state["workspace_name"]
+
 # 3. The WebGL Engine 
 three_js_code = f"""
 <!DOCTYPE html>
@@ -245,11 +249,20 @@ three_js_code = f"""
         #hud-content {{ padding: 15px; max-height: 80vh; overflow-y: auto; }}
         .hud-section {{ margin-top: 5px; margin-bottom: 5px; color: #fff; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 3px; }}
         .row {{ display: flex; justify-content: space-between; margin-bottom: 2px; }}
+        
+        #workspace-label {{ text-align: center; color: #5bc0de; font-weight: bold; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }}
         #swatch {{ width: 100%; height: 30px; border-radius: 4px; border: 1px solid #555; margin-bottom: 5px; background-color: #000; }}
-        #hex-code {{ text-align: center; font-weight: bold; letter-spacing: 2px; margin-bottom: 5px; color: #fff; }}
+        #hex-code {{ text-align: center; font-weight: bold; letter-spacing: 2px; margin-bottom: 2px; color: #fff; font-size: 16px; }}
+        #live-coords {{ text-align: center; color: #aaa; font-weight: bold; font-size: 11px; letter-spacing: 1px; margin-bottom: 10px; }}
         #freeze-status {{ text-align: center; color: gold; font-weight: bold; font-size: 11px; margin-bottom: 10px; display: none; }}
-        #export-btn {{ display: none; width: 100%; padding: 8px; margin-top: 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
-        #export-btn:hover {{ background: #45a049; }}
+        
+        #add-batch-btn {{ display: none; width: 100%; padding: 8px; margin-top: 15px; background: #5bc0de; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
+        #add-batch-btn:hover {{ background: #31b0d5; }}
+        #export-batch-btn {{ display: none; width: 100%; padding: 8px; margin-top: 8px; background: #5cb85c; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
+        #export-batch-btn:hover {{ background: #4cae4c; }}
+        #unlock-btn {{ display: none; width: 100%; padding: 8px; margin-top: 8px; background: #d9534f; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
+        #unlock-btn:hover {{ background: #c9302c; }}
+        
         #helper-text {{ position: absolute; bottom: 20px; left: 20px; color: rgba(255,255,255,0.4); font-family: sans-serif; font-size: 12px; pointer-events: none; white-space: pre-line; }}
     </style>
 </head>
@@ -257,30 +270,44 @@ three_js_code = f"""
     <div id="hud">
         <div id="hud-header"><span style="pointer-events:none;">DATA HUD</span><div id="hud-toggle">–</div></div>
         <div id="hud-content">
-            <div id="freeze-status">[ FROZEN - DBL CLICK TO UNLOCK ]</div>
+            <div id="workspace-label">📦 {workspace_name}</div>
+            <div id="freeze-status">[ TARGET LOCKED ]</div>
+            
             <div id="swatch"></div>
             <div id="hex-code">#000000</div>
+            <div id="live-coords">LAT 0° &nbsp;|&nbsp; LON 0°<br><span style="color:#888; font-size:10px;">X: 0.00 &nbsp;|&nbsp; Y: 0.00</span></div>
             
-            <div class="hud-section">Pole Coordinates</div>
-            <div class="row"><span>{name_y_pos} (Y+)</span><span id="p-yp">0%</span></div>
-            <div class="row"><span>{name_y_neg} (Y-)</span><span id="p-yn">0%</span></div>
-            <div class="row"><span>{name_x_pos} (X+)</span><span id="p-xp">0%</span></div>
-            <div class="row"><span>{name_x_neg} (X-)</span><span id="p-xn">0%</span></div>
-            <div class="row"><span>{name_z_pos} (Z+)</span><span id="p-zp">0%</span></div>
-            <div class="row"><span>{name_z_neg} (Z-)</span><span id="p-zn">0%</span></div>
-            
-            <div class="hud-section">Pigment State Mix</div>
-            <div class="row"><span>Mass Tone (Thick)</span><span id="ld-mass">0%</span></div>
-            <div class="row"><span>Mid Tone (Pure)</span><span id="ld-mid">0%</span></div>
-            <div class="row"><span>Wash (Diluted)</span><span id="ld-wash">0%</span></div>
+            <div id="pie-container" style="display: none;">
+                <div id="pie-chart-circle" style="width: 140px; height: 140px; border-radius: 50%; margin: 15px auto;"></div>
+                <div class="hud-section">Active Mix Recipe</div>
+                <div id="pie-legend"></div>
+            </div>
 
-            <div class="hud-section">Atmosphere Addition</div>
-            <div class="row" style="display: {'flex' if show_abyss else 'none'};"><span>{name_abyss}</span><span id="z-abyss">0%</span></div>
-            <div class="row" style="display: {'flex' if show_core else 'none'};"><span>{name_core}</span><span id="z-core">0%</span></div>
-            <div class="row" style="display: {'flex' if show_luma else 'none'};"><span>{name_luma}</span><span id="z-luma">0%</span></div>
-            <div class="row" style="display: {'flex' if show_heat else 'none'};"><span>{name_heat}</span><span id="z-heat">0%</span></div>
-            <div class="row" style="display: {'flex' if show_crust else 'none'};"><span>{name_crust}</span><span id="z-crust">0%</span></div>
-            <button id="export-btn">Export Pixel Snapshot</button>
+            <div class="hud-section">Application Weight</div>
+            <div class="row"><span>Heavy Weight (Mass)</span><span id="ld-mass">0%</span></div>
+            <div class="row"><span>Normal Weight (Mid)</span><span id="ld-mid">0%</span></div>
+            <div class="row"><span>Light Weight (Wash)</span><span id="ld-wash">0%</span></div>
+
+            <div id="standard-lists">
+                <div class="hud-section">Pole Coordinates</div>
+                <div class="row"><span>{name_y_pos} (Y+)</span><span id="p-yp">0%</span></div>
+                <div class="row"><span>{name_y_neg} (Y-)</span><span id="p-yn">0%</span></div>
+                <div class="row"><span>{name_x_pos} (X+)</span><span id="p-xp">0%</span></div>
+                <div class="row"><span>{name_x_neg} (X-)</span><span id="p-xn">0%</span></div>
+                <div class="row"><span>{name_z_pos} (Z+)</span><span id="p-zp">0%</span></div>
+                <div class="row"><span>{name_z_neg} (Z-)</span><span id="p-zn">0%</span></div>
+                
+                <div class="hud-section">Atmosphere Addition</div>
+                <div class="row" style="display: {'flex' if show_abyss else 'none'};"><span>{name_abyss}</span><span id="z-abyss">0%</span></div>
+                <div class="row" style="display: {'flex' if show_core else 'none'};"><span>{name_core}</span><span id="z-core">0%</span></div>
+                <div class="row" style="display: {'flex' if show_luma else 'none'};"><span>{name_luma}</span><span id="z-luma">0%</span></div>
+                <div class="row" style="display: {'flex' if show_heat else 'none'};"><span>{name_heat}</span><span id="z-heat">0%</span></div>
+                <div class="row" style="display: {'flex' if show_crust else 'none'};"><span>{name_crust}</span><span id="z-crust">0%</span></div>
+            </div>
+            
+            <button id="add-batch-btn">ADD TO BATCH (<span id="batch-count">0</span>)</button>
+            <button id="export-batch-btn">EXPORT BATCH HTML</button>
+            <button id="unlock-btn">UNLOCK TARGET</button>
         </div>
     </div>
     <div id="helper-text">Left-Click: Rotate | Right-Click: Pan | Scroll: Zoom</div>
@@ -377,10 +404,13 @@ three_js_code = f"""
         function mVec(v1, v2, a) {{ return [v1[0]*(1-a)+v2[0]*a, v1[1]*(1-a)+v2[1]*a, v1[2]*(1-a)+v2[2]*a]; }}
         const tHex = (c) => c.toString(16).padStart(2,'0').toUpperCase();
         
-        let isDrag=false, isPan=false, isFroz=false, lastMouse={{x:0,y:0}}, snapData="", iDist=null, lMid={{x:0,y:0}}, hDrag=false, hOx=0, hOy=0;
+        let isDrag=false, isPan=false, isFroz=false, lastMouse={{x:0,y:0}}, iDist=null, lMid={{x:0,y:0}}, hDrag=false, hOx=0, hOy=0;
+        let colorCart = []; 
+        let currentX = "0.00", currentY = "0.00"; // Store exact physical mouse X/Y tracking
+        let workspaceName = "{workspace_name}";
+        
         const hud=document.getElementById('hud'), hHead=document.getElementById('hud-header'), hCont=document.getElementById('hud-content'), hTog=document.getElementById('hud-toggle');
         
-        // BUG FIX: Natively intercept pointer events so touch/mouse don't trigger the drag handler underneath it
         hTog.addEventListener('pointerdown', (e) => {{
             e.stopPropagation();
             hCont.style.display = hCont.style.display === 'none' ? 'block' : 'none';
@@ -394,13 +424,165 @@ three_js_code = f"""
         const doMove = (e) => {{ if(!hDrag) return; let evt=e.touches?e.touches[0]:e; hud.style.left=(evt.clientX-hOx)+'px'; hud.style.top=(evt.clientY-hOy)+'px'; hud.style.right='auto'; }};
         window.addEventListener('mousemove', doMove); window.addEventListener('touchmove', doMove, {{passive:true}});
 
-        function togFroz() {{ isFroz=!isFroz; hud.style.borderColor=isFroz?'gold':'rgba(255,255,255,0.15)'; document.getElementById('freeze-status').style.display=isFroz?'block':'none'; document.getElementById('export-btn').style.display=isFroz?'block':'none'; }}
-        document.addEventListener('dblclick', (e) => {{ if(!e.target.closest('#hud')) togFroz(); }});
-        let lTap=0; document.addEventListener('touchend', (e) => {{ if(e.target.closest('#hud')||hDrag) return; let t=new Date().getTime(); if(t-lTap<400 && t-lTap>0) togFroz(); lTap=t; }});
+        // --- THE HARD LOCK MECHANISM ---
+        function lockHud() {{ 
+            if(isFroz) return; 
+            isFroz = true; 
+            hud.style.borderColor = 'gold'; 
+            document.getElementById('freeze-status').style.display = 'block'; 
+            document.getElementById('add-batch-btn').style.display = 'block'; 
+            document.getElementById('export-batch-btn').style.display = 'block'; 
+            document.getElementById('unlock-btn').style.display = 'block'; 
+            document.getElementById('pie-container').style.display = 'block';
+            document.getElementById('standard-lists').style.display = 'none';
+        }}
         
-        document.getElementById('export-btn').addEventListener('click', () => {{
-            const a = document.createElement('a'); a.href = window.URL.createObjectURL(new Blob([snapData], {{type:'text/plain'}}));
-            a.download = 'Sphere_'+document.getElementById('hex-code').innerText+'.txt'; a.click();
+        function unlockHud() {{
+            isFroz = false;
+            hud.style.borderColor = 'rgba(255,255,255,0.15)'; 
+            document.getElementById('freeze-status').style.display = 'none'; 
+            document.getElementById('add-batch-btn').style.display = 'none'; 
+            document.getElementById('export-batch-btn').style.display = 'none'; 
+            document.getElementById('unlock-btn').style.display = 'none'; 
+            document.getElementById('pie-container').style.display = 'none';
+            document.getElementById('standard-lists').style.display = 'block';
+        }}
+
+        // Listeners for Locking/Unlocking
+        document.getElementById('unlock-btn').addEventListener('click', unlockHud);
+        document.addEventListener('dblclick', (e) => {{ if(!e.target.closest('#hud')) lockHud(); }});
+        let lTap=0; document.addEventListener('touchend', (e) => {{ if(e.target.closest('#hud')||hDrag) return; let t=new Date().getTime(); if(t-lTap<400 && t-lTap>0) lockHud(); lTap=t; }});
+        
+        // --- ADD TO BATCH LOGIC ---
+        document.getElementById('add-batch-btn').addEventListener('click', () => {{
+            let currentHex = document.getElementById('hex-code').innerText;
+            let recipe = document.getElementById('pie-legend').innerHTML;
+            let pieSvg = document.getElementById('pie-chart-circle').innerHTML;
+            let weightMass = document.getElementById('ld-mass').innerText;
+            let weightMid = document.getElementById('ld-mid').innerText;
+            let weightWash = document.getElementById('ld-wash').innerText;
+            
+            let dX = Math.round((customUniforms.uRotX.value*180/Math.PI)%360); if(dX<0) dX+=360;
+            let dY = Math.round((customUniforms.uRotY.value*180/Math.PI)%360); if(dY<0) dY+=360;
+            
+            colorCart.push({{
+                hex: currentHex,
+                recipe: recipe,
+                pieSvg: pieSvg,
+                wMass: weightMass,
+                wMid: weightMid,
+                wWash: weightWash,
+                lat: dX,
+                lon: dY,
+                tX: currentX,
+                tY: currentY
+            }});
+            
+            let btn = document.getElementById('add-batch-btn');
+            btn.innerText = "ADDED!";
+            btn.style.background = "#4CAF50";
+            setTimeout(() => {{
+                btn.innerHTML = `ADD TO BATCH (<span id="batch-count">${{colorCart.length}}</span>)`;
+                btn.style.background = "#5bc0de";
+            }}, 800);
+        }});
+
+        // --- EXPORT BATCH LOGIC ---
+        document.getElementById('export-batch-btn').addEventListener('click', () => {{
+            if(colorCart.length === 0) {{
+                alert("Your batch is empty! Click 'ADD TO BATCH' first to save a color.");
+                return;
+            }}
+            
+            let htmlStr = `<!DOCTYPE html>
+<html>
+<head>
+    <title>Color Sphere Batch Export</title>
+    <style>
+        body {{ 
+            font-family: system-ui, sans-serif; 
+            background: #f4f4f9; 
+            padding: 40px; 
+            color: #333; 
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
+        }}
+        .card {{ background: white; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; gap: 30px; align-items: stretch; box-shadow: 0 4px 10px rgba(0,0,0,0.05); page-break-inside: avoid; break-inside: avoid; }}
+        
+        .swatch-group {{ display: flex; gap: 15px; align-items: center; border-right: 2px solid #f0f0f0; padding-right: 20px; }}
+        .swatch-col {{ text-align: center; display: flex; flex-direction: column; align-items: center; }}
+        
+        .swatch, .empty-box {{ width: 120px; height: 120px; border-radius: 12px; }}
+        .swatch {{ box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1); }}
+        .empty-box {{ background: white; border: 2px dashed #bbb; }}
+        
+        .hex {{ font-weight: bold; font-size: 1.1rem; margin-top: 10px; letter-spacing: 1px; color: #555; }}
+        
+        .pie-container {{ display: flex; align-items: center; padding: 0 15px; border-right: 2px solid #f0f0f0; }}
+        .pie {{ width: 100px; height: 100px; border-radius: 50%; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; background: white; }}
+        
+        .recipe-col {{ flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }}
+        .coords {{ font-size: 0.9rem; color: #888; margin-bottom: 5px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; }}
+        .recipe-row {{ display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; font-size: 1rem; }}
+        .weights {{ display: flex; gap: 15px; margin-top: 15px; font-size: 0.9rem; color: #666; font-weight: bold; }}
+        .w-box {{ background: #eee; padding: 6px 12px; border-radius: 6px; }}
+        
+        @media print {{
+            body {{ padding: 10px; background: white; }}
+            .card {{ padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; box-shadow: none; gap: 15px; }}
+            .swatch-group {{ padding-right: 15px; }}
+            .pie-container {{ padding: 0 10px; }}
+            .swatch, .empty-box {{ width: 100px; height: 100px; }}
+            .pie {{ width: 80px; height: 80px; border: none; }}
+            .hex {{ font-size: 1rem; }}
+            h1 {{ font-size: 1.3rem; margin-top: 0; }}
+            .weights {{ font-size: 0.8rem; gap: 10px; flex-wrap: wrap; }}
+        }}
+    </style>
+</head>
+<body>
+    <h1>My Custom Color Recipe Workbook</h1>
+    <p style="color: #666; margin-top: -15px; margin-bottom: 30px; font-weight: bold;">📦 Workspace: ${{workspaceName}}</p>`;
+
+            colorCart.forEach(item => {{
+                htmlStr += `
+                <div class="card">
+                    <div class="swatch-group">
+                        <div class="swatch-col">
+                            <div class="swatch" style="background-color: ${{item.hex}};"></div>
+                            <div class="hex">${{item.hex}}</div>
+                        </div>
+                        <div class="swatch-col">
+                            <div class="empty-box"></div>
+                            <div class="hex" style="color: #aaa; font-weight: normal; font-size: 0.9rem;">Physical Match</div>
+                        </div>
+                    </div>
+                    
+                    <div class="pie-container">
+                        <div class="pie">${{item.pieSvg}}</div>
+                    </div>
+                    
+                    <div class="recipe-col">
+                        <div class="coords">📍 Lat ${{item.lat}}°, Lon ${{item.lon}}° &nbsp;|&nbsp; 🎯 Target X: ${{item.tX}}, Y: ${{item.tY}}</div>
+                        <h3 style="margin-top:0; margin-bottom: 10px;">Active Recipe</h3>
+                        <div style="max-width: 350px;">
+                            ${{item.recipe.replace(/class="row"/g, 'class="recipe-row"')}}
+                        </div>
+                        <div class="weights">
+                            <div class="w-box">Heavy Weight: ${{item.wMass}}</div>
+                            <div class="w-box">Normal: ${{item.wMid}}</div>
+                            <div class="w-box">Light: ${{item.wWash}}</div>
+                        </div>
+                    </div>
+                </div>`;
+            }});
+
+            htmlStr += `</body></html>`;
+            
+            const a = document.createElement('a'); 
+            a.href = window.URL.createObjectURL(new Blob([htmlStr], {{type:'text/html'}}));
+            a.download = 'Color_Workbook_Export.html'; 
+            a.click();
         }});
 
         function processRay(cX, cY) {{
@@ -409,6 +591,9 @@ three_js_code = f"""
             let hPt = null; for(let i=0; i<ints.length; i++) {{ if(ints[i].point.x>0.001 && ints[i].point.y>0.001 && ints[i].point.z>0.001) continue; hPt=ints[i].point; break; }}
             
             if(hPt) {{
+                currentX = hPt.x.toFixed(2);
+                currentY = hPt.y.toFixed(2);
+                
                 let r = Math.sqrt(hPt.x*hPt.x + hPt.y*hPt.y + hPt.z*hPt.z);
                 let cx=Math.cos(customUniforms.uRotX.value), sx=Math.sin(customUniforms.uRotX.value), cy=Math.cos(customUniforms.uRotY.value), sy=Math.sin(customUniforms.uRotY.value);
                 let spX=cy*hPt.x-sy*hPt.z, spY=hPt.y, spZ=sy*hPt.x+cy*hPt.z;
@@ -418,6 +603,10 @@ three_js_code = f"""
                 let wX=Math.pow(Math.abs(n.x),{brilliance}), wY=Math.pow(Math.abs(n.y),{brilliance}), wZ=Math.pow(Math.abs(n.z),{brilliance});
                 let tot=wX+wY+wZ; wX/=tot; wY/=tot; wZ/=tot;
                 let pr=(n.y>0?wY*100:0).toFixed(1), pc=(n.y<=0?wY*100:0).toFixed(1), py=(n.x>0?wX*100:0).toFixed(1), pb=(n.x<=0?wX*100:0).toFixed(1), pg=(n.z>0?wZ*100:0).toFixed(1), pm=(n.z<=0?wZ*100:0).toFixed(1);
+
+                let dX=(customUniforms.uRotX.value*180/Math.PI)%360, dY=(customUniforms.uRotY.value*180/Math.PI)%360; if(dX<0) dX+=360; if(dY<0) dY+=360;
+                
+                document.getElementById('live-coords').innerHTML = `LAT ${{Math.round(dX)}}° \u00A0|\u00A0 LON ${{Math.round(dY)}}°<br><span style="color:#888; font-size:10px;">X: ${{currentX}} \u00A0|\u00A0 Y: ${{currentY}}</span>`;
 
                 document.getElementById('p-yp').innerText=pr+'%'; document.getElementById('p-yn').innerText=pc+'%';
                 document.getElementById('p-xp').innerText=py+'%'; document.getElementById('p-xn').innerText=pb+'%';
@@ -454,6 +643,44 @@ three_js_code = f"""
                 document.getElementById('z-heat').innerText=(zH*100).toFixed(1)+'%'; 
                 document.getElementById('z-crust').innerText=(zCr*100).toFixed(1)+'%';
                 
+                // --- PIE CHART (SVG) & DYNAMIC RECIPE LOGIC ---
+                let ingredients = [];
+                if (wY > 0 && zPure > 0) ingredients.push({{ name: n.y > 0 ? '{name_y_pos}' : '{name_y_neg}', hex: n.y > 0 ? '{yp_mid}' : '{yn_mid}', pct: wY * zPure * 100 }});
+                if (wX > 0 && zPure > 0) ingredients.push({{ name: n.x > 0 ? '{name_x_pos}' : '{name_x_neg}', hex: n.x > 0 ? '{xp_mid}' : '{xn_mid}', pct: wX * zPure * 100 }});
+                if (wZ > 0 && zPure > 0) ingredients.push({{ name: n.z > 0 ? '{name_z_pos}' : '{name_z_neg}', hex: n.z > 0 ? '{zp_mid}' : '{zn_mid}', pct: wZ * zPure * 100 }});
+                if (zA > 0) ingredients.push({{ name: '{name_abyss}', hex: '{hex_abyss}', pct: zA * 100 }});
+                if (zC > 0) ingredients.push({{ name: '{name_core}', hex: '{hex_core}', pct: zC * 100 }});
+                if (zL > 0) ingredients.push({{ name: '{name_luma}', hex: '{hex_luma}', pct: zL * 100 }});
+                if (zH > 0) ingredients.push({{ name: '{name_heat}', hex: '{hex_heat}', pct: zH * 100 }});
+                if (zCr > 0) ingredients.push({{ name: '{name_crust}', hex: '{hex_crust}', pct: zCr * 100 }});
+
+                ingredients = ingredients.filter(i => i.pct > 0.1).sort((a,b) => b.pct - a.pct);
+
+                let svgHtml = `<svg viewBox="-1 -1 2 2" style="transform: rotate(-90deg); width: 100%; height: 100%; border-radius: 50%;">`;
+                let currentPct = 0;
+                let legendHtml = "";
+                ingredients.forEach(i => {{
+                    let pctDec = i.pct / 100;
+                    let startAngle = currentPct * 2 * Math.PI;
+                    let endAngle = (currentPct + pctDec) * 2 * Math.PI;
+                    currentPct += pctDec;
+                    
+                    if (pctDec >= 0.999) {{
+                        svgHtml += `<circle cx="0" cy="0" r="1" fill="${{i.hex}}" />`;
+                    }} else {{
+                        let x1 = Math.cos(startAngle), y1 = Math.sin(startAngle);
+                        let x2 = Math.cos(endAngle), y2 = Math.sin(endAngle);
+                        let largeArc = pctDec > 0.5 ? 1 : 0;
+                        svgHtml += `<path d="M 0 0 L ${{x1}} ${{y1}} A 1 1 0 ${{largeArc}} 1 ${{x2}} ${{y2}} Z" fill="${{i.hex}}" />`;
+                    }}
+                    
+                    legendHtml += `<div class="row"><span><span style="display:inline-block;width:10px;height:10px;background:${{i.hex}};border-radius:50%;margin-right:6px;vertical-align:middle;"></span>${{i.name}}</span><span>${{i.pct.toFixed(1)}}%</span></div>`;
+                }});
+                svgHtml += `</svg>`;
+
+                document.getElementById('pie-chart-circle').innerHTML = svgHtml;
+                document.getElementById('pie-legend').innerHTML = legendHtml;
+
                 let cY_ma = n.y>0?{js_yp_ma}:{js_yn_ma}; let cX_ma = n.x>0?{js_xp_ma}:{js_xn_ma}; let cZ_ma = n.z>0?{js_zp_ma}:{js_zn_ma};
                 let cY_mi = n.y>0?{js_yp_mi}:{js_yn_mi}; let cX_mi = n.x>0?{js_xp_mi}:{js_xn_mi}; let cZ_mi = n.z>0?{js_zp_mi}:{js_zn_mi};
                 let cY_wa = n.y>0?{js_yp_wa}:{js_yn_wa}; let cX_wa = n.x>0?{js_xp_wa}:{js_xn_wa}; let cZ_wa = n.z>0?{js_zp_wa}:{js_zn_wa};
@@ -475,14 +702,9 @@ three_js_code = f"""
                 let rV=Math.round(fC[0]*255), gV=Math.round(fC[1]*255), bV=Math.round(fC[2]*255); let hS="#"+tHex(rV)+tHex(gV)+tHex(bV);
 
                 document.getElementById('swatch').style.backgroundColor=`rgb(${{rV}}, ${{gV}}, ${{bV}})`; document.getElementById('hex-code').innerText=hS;
-                let dX=(customUniforms.uRotX.value*180/Math.PI)%360, dY=(customUniforms.uRotY.value*180/Math.PI)%360; if(dX<0) dX+=360; if(dY<0) dY+=360;
-
-                let dE = ""; if({1 if show_abyss else 0}===1) dE+=`{name_abyss} (Mix {mix_ab}): ${{(zA*100).toFixed(1)}}%\\n`; if({1 if show_core else 0}===1) dE+=`{name_core} (Mix {mix_co}): ${{(zC*100).toFixed(1)}}%\\n`;
-                if({1 if show_luma else 0}===1) dE+=`{name_luma} (Mix {mix_lu}): ${{(zL*100).toFixed(1)}}%\\n`; if({1 if show_heat else 0}===1) dE+=`{name_heat} (Mix {mix_he}): ${{(zH*100).toFixed(1)}}%\\n`; if({1 if show_crust else 0}===1) dE+=`{name_crust} (Mix {mix_cr}): ${{(zCr*100).toFixed(1)}}%\\n`;
-
-                snapData = `CUSTOM PIGMENT SPHERE\\n-------------------\\nHex: ${{hS}}\\nRGB: (${{rV}},${{gV}},${{bV}})\\n\\nPOLE COORDINATES\\n-----\\n{name_y_pos}: ${{pr}}%\\n{name_y_neg}: ${{pc}}%\\n{name_x_pos}: ${{py}}%\\n{name_x_neg}: ${{pb}}%\\n{name_z_pos}: ${{pg}}%\\n{name_z_neg}: ${{pm}}%\\n\\nPIGMENT STATE MIX\\n-------------------\\nMass Tone: ${{l_mass.toFixed(1)}}%\\nMid Tone: ${{l_mid.toFixed(1)}}%\\nWash: ${{l_wash.toFixed(1)}}%\\n\\nATMOSPHERE ADDITION\\n-----\\n`+dE+`\\nCOORD\\n-----\\nLat: ${{Math.round(dX)}}\\nLon: ${{Math.round(dY)}}\\n`;
             }} else {{
-                document.querySelectorAll('.row span:nth-child(2)').forEach(el=>el.innerText='0%'); document.getElementById('swatch').style.backgroundColor='#000'; document.getElementById('hex-code').innerText='-------'; snapData="";
+                document.getElementById('live-coords').innerHTML = 'LAT ---° \u00A0|\u00A0 LON ---°<br><span style="color:#888; font-size:10px;">X: 0.00 \u00A0|\u00A0 Y: 0.00</span>';
+                document.querySelectorAll('.row span:nth-child(2)').forEach(el=>el.innerText='0%'); document.getElementById('swatch').style.backgroundColor='#000'; document.getElementById('hex-code').innerText='-------';
             }}
         }}
 
