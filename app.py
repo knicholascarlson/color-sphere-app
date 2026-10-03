@@ -244,7 +244,7 @@ rad_y = rot_y * (math.pi / 180)
 
 r_ab, f_ab = (rad_abyss, fade_abyss) if show_abyss else (0.0, 0.0)
 r_co, f_co = (rad_core, fade_core) if show_core else (0.0, 0.0)
-r_lu, f_luma = (rad_luma, fade_luma) if show_luma else (0.0, 0.0)
+r_lu, f_lu = (rad_luma, fade_luma) if show_luma else (0.0, 0.0)
 r_he, f_he = (rad_heat, fade_heat) if show_heat else (0.0, 0.0)
 r_cr, f_cr = (rad_crust, fade_crust) if show_crust else (0.0, 0.0)
 
