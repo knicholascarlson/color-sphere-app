@@ -3,21 +3,31 @@ import streamlit.components.v1 as components
 import math
 import json
 
-# 1. Page Configuration MUST be first
+# =====================================================================
+# 1. PAGE CONFIGURATION & UTILITIES
+# =====================================================================
+# Page Configuration MUST be first in Streamlit
 st.set_page_config(page_title="Color Sphere - True Pigments", layout="wide")
 
+# Remove default Streamlit padding to maximize the 3D canvas space
 st.markdown("""
     <style>
            .block-container { padding-top: 1rem; padding-bottom: 0rem; padding-left: 1rem; padding-right: 1rem; }
     </style>
     """, unsafe_allow_html=True)
 
+# Helper function to convert Hex color strings into WebGL-compatible RGB vectors
 def hex_to_vectors(hex_str):
     hex_str = hex_str.lstrip('#')
     r, g, b = int(hex_str[0:2], 16)/255.0, int(hex_str[2:4], 16)/255.0, int(hex_str[4:6], 16)/255.0
     return f"vec3({r:.3f}, {g:.3f}, {b:.3f})", f"[{r:.3f}, {g:.3f}, {b:.3f}]"
 
-# --- SESSION STATE INITIALIZATION ---
+# =====================================================================
+# 2. SESSION STATE INITIALIZATION
+# =====================================================================
+# This dictionary holds the default "physical" states of the pigments.
+# Each of the 6 anchor poles requires 3 states to mimic real paint depth:
+# Mass (thick/dark), Mid (pure hue), and Wash (diluted/transparent).
 default_state = {
     "workspace_name": "Default Studio",
     "name_y_pos": "Red (PR202/PR254)", "yp_mass": "#B50027", "yp_mid": "#DB295B", "yp_wash": "#E39FBA",
@@ -26,14 +36,18 @@ default_state = {
     "name_y_neg": "Cyan (PB15/PG7)", "yn_mass": "#20415C", "yn_mid": "#3A7CA5", "yn_wash": "#6AB6CC",
     "name_x_neg": "Blue (PB15:2)", "xn_mass": "#1E154B", "xn_mid": "#1135A2", "xn_wash": "#8AB2D7",
     "name_z_neg": "Magenta (PR202)", "zn_mass": "#701B2E", "zn_mid": "#B80F62", "zn_wash": "#DD9BB9",
+    
+    # Atmospheric Layers: Overlays that provide deep shadows or high luminous tints without muddying base hues.
     "show_abyss": True, "name_abyss": "Indigo Abyss", "hex_abyss": "#080414",
     "show_core": True, "name_core": "Violet Core", "hex_core": "#59268C",
     "show_heat": True, "name_heat": "Orange Undercrust", "hex_heat": "#FF6600",
     "show_luma": True, "name_luma": "White Luma", "hex_luma": "#F2F2F2",
     "show_crust": True, "name_crust": "Umber Crust", "hex_crust": "#26140D",
+    
+    # Global modifiers for the WebGL Sphere
     "show_grid": False, "brilliance": 1.4, "rot_x": 146, "rot_y": 315,
     
-    # Planetary Strata Defaults
+    # Planetary Strata Defaults (Radius spans from 0.0 at center to 2.0 at outer edge)
     "rad_abyss": 0.0, "fade_abyss": 0.4, "mix_abyss": 0.5,
     "rad_core": 0.2, "fade_core": 0.4, "mix_core": 0.5,
     "mass_start": 0.4, "mass_fade": 0.4,
@@ -43,11 +57,14 @@ default_state = {
     "rad_crust": 1.8, "fade_crust": 0.4, "mix_crust": 0.5
 }
 
+# Populate session state if empty
 for k, v in default_state.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 2. Sidebar Controls
+# =====================================================================
+# 3. SIDEBAR UI CONTROLS
+# =====================================================================
 with st.sidebar:
     st.markdown("### Color Sphere Studio")
     
@@ -64,6 +81,7 @@ with st.sidebar:
         Hover over the `(?)` icons next to any control for specific guidance on how to use it!
         """)
 
+    # JSON Export/Import for saving specific custom palettes
     with st.expander("💾 Save / Load Workspace", expanded=False):
         uploaded_file = st.file_uploader("Load Palette (.json)", type=["json"], key="json_uploader", help="Upload a previously saved workspace file.")
         if uploaded_file is not None:
@@ -83,6 +101,7 @@ with st.sidebar:
         export_data = {k: st.session_state[k] for k in default_state.keys() if k != "workspace_name"}
         st.download_button(label="Export Workspace to JSON", data=json.dumps(export_data, indent=4), file_name="my_color_sphere_workspace.json", mime="application/json", key="json_downloader", help="Download your current colors and slider settings to your computer.")
     
+    # 6-Pole Anchor Color Inputs
     with st.expander("🎨 6-Pole Anchor Pigments", expanded=True):
         st.markdown("*Input the hex codes for the 3 physical states of your paint.*")
         
@@ -127,6 +146,7 @@ with st.sidebar:
         zn_mid = c2.color_picker("Mid", key="zn_mid")
         zn_wash = c3.color_picker("Wash", key="zn_wash")
 
+    # Atmosphere Layer Settings
     with st.expander("🌫️ Atmosphere Toggles", expanded=False):
         st.markdown("*Toggle and define the deep shadow and bright highlight layers.*")
         col3, col4 = st.columns(2)
@@ -148,6 +168,7 @@ with st.sidebar:
             name_crust = st.text_input("Crust Name", key="name_crust")
             hex_crust = st.color_picker("Crust Color", key="hex_crust")
 
+    # Geologic / Radial Strata Settings
     with st.expander("🎛️ Planetary Strata (Boundaries & Fades)", expanded=False):
         st.markdown("*Geologic sizing. Radius spans from 0.0 (Center) to 2.0 (Outer Edge).*")
         show_grid = st.toggle("Show Wireframe Grid", key="show_grid")
@@ -201,7 +222,10 @@ with st.sidebar:
         rot_x = st.slider("Rotate Latitude", 0, 360, key="rot_x", step=1, help="Spin the sphere vertically.")
         rot_y = st.slider("Rotate Longitude", 0, 360, key="rot_y", step=1, help="Spin the sphere horizontally.")
 
-# Pre-calculate all 18 anchor vectors
+# =====================================================================
+# 4. PRE-PROCESSING FOR SHADER (Hex to Vector generation)
+# =====================================================================
+# Pre-calculate all 18 anchor vectors to feed directly into the WebGL Shader Uniforms
 gl_yp_ma, js_yp_ma = hex_to_vectors(yp_mass); gl_yp_mi, js_yp_mi = hex_to_vectors(yp_mid); gl_yp_wa, js_yp_wa = hex_to_vectors(yp_wash)
 gl_yn_ma, js_yn_ma = hex_to_vectors(yn_mass); gl_yn_mi, js_yn_mi = hex_to_vectors(yn_mid); gl_yn_wa, js_yn_wa = hex_to_vectors(yn_wash)
 gl_xp_ma, js_xp_ma = hex_to_vectors(xp_mass); gl_xp_mi, js_xp_mi = hex_to_vectors(xp_mid); gl_xp_wa, js_xp_wa = hex_to_vectors(xp_wash)
@@ -220,7 +244,7 @@ rad_y = rot_y * (math.pi / 180)
 
 r_ab, f_ab = (rad_abyss, fade_abyss) if show_abyss else (0.0, 0.0)
 r_co, f_co = (rad_core, fade_core) if show_core else (0.0, 0.0)
-r_lu, f_lu = (rad_luma, fade_luma) if show_luma else (0.0, 0.0)
+r_lu, f_luma = (rad_luma, fade_luma) if show_luma else (0.0, 0.0)
 r_he, f_he = (rad_heat, fade_heat) if show_heat else (0.0, 0.0)
 r_cr, f_cr = (rad_crust, fade_crust) if show_crust else (0.0, 0.0)
 
@@ -232,13 +256,18 @@ mix_cr = st.session_state["mix_crust"] if show_crust else 0.0
 
 workspace_name = st.session_state["workspace_name"]
 
-# 3. The WebGL Engine 
+# =====================================================================
+# 5. THE WEBGL ENGINE (THREE.JS / CUSTOM SHADER)
+# =====================================================================
+# This string is pure HTML/JS containing the Three.js scene, the custom Fragment Shader, 
+# the Raycasting logic for the HUD, and the Export-to-HTML workbook logic.
 three_js_code = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
+        /* Base styles and HUD UI definitions */
         body {{ margin: 0; overflow: hidden; background-color: #0e1117; cursor: crosshair; user-select: none; touch-action: none; overscroll-behavior: none; }}
         body:active {{ cursor: grabbing; }}
         canvas {{ display: block; }}
@@ -256,6 +285,7 @@ three_js_code = f"""
         #live-coords {{ text-align: center; color: #aaa; font-weight: bold; font-size: 11px; letter-spacing: 1px; margin-bottom: 10px; }}
         #freeze-status {{ text-align: center; color: gold; font-weight: bold; font-size: 11px; margin-bottom: 10px; display: none; }}
         
+        /* Batch Action Buttons */
         #add-batch-btn {{ display: none; width: 100%; padding: 8px; margin-top: 15px; background: #5bc0de; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
         #add-batch-btn:hover {{ background: #31b0d5; }}
         #export-batch-btn {{ display: none; width: 100%; padding: 8px; margin-top: 8px; background: #5cb85c; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }}
@@ -319,6 +349,7 @@ three_js_code = f"""
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
+        // Inject all Python Streamlit slider values as Uniforms into the WebGL Shader
         const customUniforms = {{
             uBrilliance: {{ value: {brilliance} }}, uRotX: {{ value: {rad_x} }}, uRotY: {{ value: {rad_y} }},
             uMassStart: {{ value: {mass_start} }}, uMassFade: {{ value: {mass_fade} }},
@@ -330,6 +361,7 @@ three_js_code = f"""
             uCrRad: {{ value: {r_cr} }}, uCrFade: {{ value: {f_cr} }}, uCrMix: {{ value: {mix_cr} }}
         }};
 
+        // Fragment Shader: Handles the complex Math of 3-state pigments and atmospheric layers
         const material = new THREE.ShaderMaterial({{
             side: THREE.DoubleSide, uniforms: customUniforms,
             vertexShader: `varying vec3 vPos; void main() {{ vec4 wp = modelMatrix * vec4(position, 1.0); vPos = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }}`,
@@ -339,16 +371,22 @@ three_js_code = f"""
                 uniform float uAbRad, uAbFade, uAbMix, uCoRad, uCoFade, uCoMix;
                 uniform float uLuRad, uLuFade, uLuMix, uHeRad, uHeFade, uHeMix, uCrRad, uCrFade, uCrMix;
                 varying vec3 vPos;
+                
+                // Rotation matrices mapped to UI sliders
                 mat3 rx(float a) {{ float s=sin(a), c=cos(a); return mat3(1.,0.,0.,0.,c,-s,0.,s,c); }}
                 mat3 ry(float a) {{ float s=sin(a), c=cos(a); return mat3(c,0.,s,0.,1.,0.,-s,0.,c); }}
                 
                 void main() {{
+                    // Discard outer positive corner to create the "cutaway" view into the core
                     if(vPos.x > 0.001 && vPos.y > 0.001 && vPos.z > 0.001) discard;
+                    
                     float r = length(vPos); vec3 n = normalize(rx(uRotX) * ry(uRotY) * vPos);
                     
+                    // Brilliance dictates how sharply or softly the colors blend across the sphere
                     float wX = pow(abs(n.x), uBrilliance), wY = pow(abs(n.y), uBrilliance), wZ = pow(abs(n.z), uBrilliance);
                     float tot = wX + wY + wZ; 
                     
+                    // Pole Interpolation: Determines Base Hues (Mass, Mid, Wash)
                     vec3 cY_ma = n.y > 0. ? {gl_yp_ma} : {gl_yn_ma}; vec3 cX_ma = n.x > 0. ? {gl_xp_ma} : {gl_xn_ma}; vec3 cZ_ma = n.z > 0. ? {gl_zp_ma} : {gl_zn_ma};
                     vec3 pC_ma = cX_ma*(wX/tot) + cY_ma*(wY/tot) + cZ_ma*(wZ/tot);
                     
@@ -358,12 +396,14 @@ three_js_code = f"""
                     vec3 cY_wa = n.y > 0. ? {gl_yp_wa} : {gl_yn_wa}; vec3 cX_wa = n.x > 0. ? {gl_xp_wa} : {gl_xn_wa}; vec3 cZ_wa = n.z > 0. ? {gl_zp_wa} : {gl_zn_wa};
                     vec3 pC_wa = cX_wa*(wX/tot) + cY_wa*(wY/tot) + cZ_wa*(wZ/tot);
                     
+                    // Radial Distance Interpolation (Pigment Depth from Core to Crust)
                     float mix1 = smoothstep(uMassStart, uMassStart + uMassFade + 0.0001, r);
                     float mix2 = smoothstep(uWashStart, uWashStart + uWashFade + 0.0001, r);
                     
                     vec3 c_mass_to_mid = mix(pC_ma, pC_mi, mix1);
                     vec3 pC_pure = mix(c_mass_to_mid, pC_wa, mix2);
                     
+                    // Atmosphere Overlay Processing based on radial boundaries
                     float vAb = {1 if show_abyss else 0}==1 ? 1.0 - smoothstep(uAbRad, uAbRad + uAbFade + 0.0001, r) : 0.0;
                     float vCo = {1 if show_core else 0}==1 ? 1.0 - smoothstep(uCoRad, uCoRad + uCoFade + 0.0001, r) : 0.0;
                     float vLu = {1 if show_luma else 0}==1 ? smoothstep(uLuRad, uLuRad + uLuFade + 0.0001, r) : 0.0;
@@ -372,6 +412,7 @@ three_js_code = f"""
                     
                     vec3 fC = pC_pure; 
                     
+                    // Apply Atmospheric Mixes overlaying the pure pigment hue
                     fC = mix(fC, mix(pC_mi, {gl_core}, uCoMix), vCo); 
                     fC = mix(fC, mix(pC_mi, {gl_abyss}, uAbMix), vAb); 
                     fC = mix(fC, mix(pC_mi, {gl_luma}, uLuMix), vLu); 
@@ -386,15 +427,18 @@ three_js_code = f"""
         const sphereGeo = new THREE.SphereGeometry(2, 64, 64);
         group.add(new THREE.Mesh(sphereGeo, material));
 
+        // Optional wireframe rendering
         if ({"true" if show_grid else "false"}) {{
             group.add(new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({{color:0xffffff, wireframe:true, transparent:true, opacity:0.15}})));
         }}
 
+        // Rendering the "cutaway" interior walls
         const wallGeo = new THREE.CircleGeometry(2, 32, 0, Math.PI / 2);
         const w1 = new THREE.Mesh(wallGeo, material); const w2 = new THREE.Mesh(wallGeo, material); w2.rotation.y = -Math.PI / 2;
         const w3 = new THREE.Mesh(wallGeo, material); w3.rotation.x = Math.PI / 2;
         group.add(w1); group.add(w2); group.add(w3); scene.add(group);
 
+        // Camera Management
         let curZoom = 6.0, panT = new THREE.Vector3(0,0,0);
         function updCam() {{ curZoom = Math.max(2.5, Math.min(25., curZoom)); let cV = curZoom/Math.sqrt(3); camera.position.set(cV+panT.x, cV+panT.y, cV+panT.z); camera.lookAt(panT); }}
         updCam();
@@ -404,6 +448,7 @@ three_js_code = f"""
         function mVec(v1, v2, a) {{ return [v1[0]*(1-a)+v2[0]*a, v1[1]*(1-a)+v2[1]*a, v1[2]*(1-a)+v2[2]*a]; }}
         const tHex = (c) => c.toString(16).padStart(2,'0').toUpperCase();
         
+        // HUD & Interaction States
         let isDrag=false, isPan=false, isFroz=false, lastMouse={{x:0,y:0}}, iDist=null, lMid={{x:0,y:0}}, hDrag=false, hOx=0, hOy=0;
         let colorCart = []; 
         let currentX = "0.00", currentY = "0.00"; // Store exact physical mouse X/Y tracking
@@ -411,6 +456,7 @@ three_js_code = f"""
         
         const hud=document.getElementById('hud'), hHead=document.getElementById('hud-header'), hCont=document.getElementById('hud-content'), hTog=document.getElementById('hud-toggle');
         
+        // HUD Drag/Toggle Logic
         hTog.addEventListener('pointerdown', (e) => {{
             e.stopPropagation();
             hCont.style.display = hCont.style.display === 'none' ? 'block' : 'none';
@@ -424,7 +470,7 @@ three_js_code = f"""
         const doMove = (e) => {{ if(!hDrag) return; let evt=e.touches?e.touches[0]:e; hud.style.left=(evt.clientX-hOx)+'px'; hud.style.top=(evt.clientY-hOy)+'px'; hud.style.right='auto'; }};
         window.addEventListener('mousemove', doMove); window.addEventListener('touchmove', doMove, {{passive:true}});
 
-        // --- THE HARD LOCK MECHANISM ---
+        // --- THE HARD LOCK MECHANISM (Double Click locks current data point for export) ---
         function lockHud() {{ 
             if(isFroz) return; 
             isFroz = true; 
@@ -453,7 +499,7 @@ three_js_code = f"""
         document.addEventListener('dblclick', (e) => {{ if(!e.target.closest('#hud')) lockHud(); }});
         let lTap=0; document.addEventListener('touchend', (e) => {{ if(e.target.closest('#hud')||hDrag) return; let t=new Date().getTime(); if(t-lTap<400 && t-lTap>0) lockHud(); lTap=t; }});
         
-        // --- ADD TO BATCH LOGIC ---
+        // --- ADD TO BATCH LOGIC (Stores specific color mixes for HTML export) ---
         document.getElementById('add-batch-btn').addEventListener('click', () => {{
             let currentHex = document.getElementById('hex-code').innerText;
             let recipe = document.getElementById('pie-legend').innerHTML;
@@ -466,16 +512,9 @@ three_js_code = f"""
             let dY = Math.round((customUniforms.uRotY.value*180/Math.PI)%360); if(dY<0) dY+=360;
             
             colorCart.push({{
-                hex: currentHex,
-                recipe: recipe,
-                pieSvg: pieSvg,
-                wMass: weightMass,
-                wMid: weightMid,
-                wWash: weightWash,
-                lat: dX,
-                lon: dY,
-                tX: currentX,
-                tY: currentY
+                hex: currentHex, recipe: recipe, pieSvg: pieSvg,
+                wMass: weightMass, wMid: weightMid, wWash: weightWash,
+                lat: dX, lon: dY, tX: currentX, tY: currentY
             }});
             
             let btn = document.getElementById('add-batch-btn');
@@ -487,7 +526,7 @@ three_js_code = f"""
             }}, 800);
         }});
 
-        // --- EXPORT BATCH LOGIC ---
+        // --- EXPORT BATCH LOGIC (Generates downloadable Workbook HTML) ---
         document.getElementById('export-batch-btn').addEventListener('click', () => {{
             if(colorCart.length === 0) {{
                 alert("Your batch is empty! Click 'ADD TO BATCH' first to save a color.");
@@ -499,28 +538,17 @@ three_js_code = f"""
 <head>
     <title>Color Sphere Batch Export</title>
     <style>
-        body {{ 
-            font-family: system-ui, sans-serif; 
-            background: #f4f4f9; 
-            padding: 40px; 
-            color: #333; 
-            -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
-        }}
+        /* PDF-friendly Workbook Styles */
+        body {{ font-family: system-ui, sans-serif; background: #f4f4f9; padding: 40px; color: #333; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }}
         .card {{ background: white; border-radius: 12px; padding: 20px; margin-bottom: 25px; display: flex; gap: 30px; align-items: stretch; box-shadow: 0 4px 10px rgba(0,0,0,0.05); page-break-inside: avoid; break-inside: avoid; }}
-        
         .swatch-group {{ display: flex; gap: 15px; align-items: center; border-right: 2px solid #f0f0f0; padding-right: 20px; }}
         .swatch-col {{ text-align: center; display: flex; flex-direction: column; align-items: center; }}
-        
         .swatch, .empty-box {{ width: 120px; height: 120px; border-radius: 12px; }}
         .swatch {{ box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1); }}
         .empty-box {{ background: white; border: 2px dashed #bbb; }}
-        
         .hex {{ font-weight: bold; font-size: 1.1rem; margin-top: 10px; letter-spacing: 1px; color: #555; }}
-        
         .pie-container {{ display: flex; align-items: center; padding: 0 15px; border-right: 2px solid #f0f0f0; }}
         .pie {{ width: 100px; height: 100px; border-radius: 50%; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; background: white; }}
-        
         .recipe-col {{ flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }}
         .coords {{ font-size: 0.9rem; color: #888; margin-bottom: 5px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; }}
         .recipe-row {{ display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; font-size: 1rem; }}
@@ -585,8 +613,10 @@ three_js_code = f"""
             a.click();
         }});
 
+        // --- RAYCASTING (Updates the HUD on mouse hover) ---
         function processRay(cX, cY) {{
-            if(isFroz) return; mouse.x=(cX/window.innerWidth)*2-1; mouse.y=-(cY/window.innerHeight)*2+1; raycaster.setFromCamera(mouse, camera);
+            if(isFroz) return; // Stop tracking if double-clicked/locked
+            mouse.x=(cX/window.innerWidth)*2-1; mouse.y=-(cY/window.innerHeight)*2+1; raycaster.setFromCamera(mouse, camera);
             const ints = raycaster.intersectObjects(group.children.filter(c => !c.material.wireframe));
             let hPt = null; for(let i=0; i<ints.length; i++) {{ if(ints[i].point.x>0.001 && ints[i].point.y>0.001 && ints[i].point.z>0.001) continue; hPt=ints[i].point; break; }}
             
@@ -594,6 +624,7 @@ three_js_code = f"""
                 currentX = hPt.x.toFixed(2);
                 currentY = hPt.y.toFixed(2);
                 
+                // Translate WebGL 3D coordinates into relative Color-Pole weights
                 let r = Math.sqrt(hPt.x*hPt.x + hPt.y*hPt.y + hPt.z*hPt.z);
                 let cx=Math.cos(customUniforms.uRotX.value), sx=Math.sin(customUniforms.uRotX.value), cy=Math.cos(customUniforms.uRotY.value), sy=Math.sin(customUniforms.uRotY.value);
                 let spX=cy*hPt.x-sy*hPt.z, spY=hPt.y, spZ=sy*hPt.x+cy*hPt.z;
@@ -612,6 +643,7 @@ three_js_code = f"""
                 document.getElementById('p-xp').innerText=py+'%'; document.getElementById('p-xn').innerText=pb+'%';
                 document.getElementById('p-zp').innerText=pg+'%'; document.getElementById('p-zn').innerText=pm+'%';
                 
+                // Track Atmospheric overlap
                 let vAb = {1 if show_abyss else 0}===1 ? 1.0 - sstep({r_ab}, {r_ab}+{f_ab}+0.0001, r) : 0.0;
                 let vCo = {1 if show_core else 0}===1 ? 1.0 - sstep({r_co}, {r_co}+{f_co}+0.0001, r) : 0.0;
                 let vLu = {1 if show_luma else 0}===1 ? sstep({r_lu}, {r_lu}+{f_lu}+0.0001, r) : 0.0;
@@ -644,6 +676,7 @@ three_js_code = f"""
                 document.getElementById('z-crust').innerText=(zCr*100).toFixed(1)+'%';
                 
                 // --- PIE CHART (SVG) & DYNAMIC RECIPE LOGIC ---
+                // Generates the visual breakdown of current pigment ingredients
                 let ingredients = [];
                 if (wY > 0 && zPure > 0) ingredients.push({{ name: n.y > 0 ? '{name_y_pos}' : '{name_y_neg}', hex: n.y > 0 ? '{yp_mid}' : '{yn_mid}', pct: wY * zPure * 100 }});
                 if (wX > 0 && zPure > 0) ingredients.push({{ name: n.x > 0 ? '{name_x_pos}' : '{name_x_neg}', hex: n.x > 0 ? '{xp_mid}' : '{xn_mid}', pct: wX * zPure * 100 }});
@@ -681,6 +714,7 @@ three_js_code = f"""
                 document.getElementById('pie-chart-circle').innerHTML = svgHtml;
                 document.getElementById('pie-legend').innerHTML = legendHtml;
 
+                // Final Hex Output calculation for the HUD Swatch
                 let cY_ma = n.y>0?{js_yp_ma}:{js_yn_ma}; let cX_ma = n.x>0?{js_xp_ma}:{js_xn_ma}; let cZ_ma = n.z>0?{js_zp_ma}:{js_zn_ma};
                 let cY_mi = n.y>0?{js_yp_mi}:{js_yn_mi}; let cX_mi = n.x>0?{js_xp_mi}:{js_xn_mi}; let cZ_mi = n.z>0?{js_zp_mi}:{js_zn_mi};
                 let cY_wa = n.y>0?{js_yp_wa}:{js_yn_wa}; let cX_wa = n.x>0?{js_xp_wa}:{js_xn_wa}; let cZ_wa = n.z>0?{js_zp_wa}:{js_zn_wa};
@@ -708,6 +742,7 @@ three_js_code = f"""
             }}
         }}
 
+        // General Navigation Listeners
         document.addEventListener('mousedown', (e) => {{ if(e.target.closest('#hud')) return; if(e.button===2) isPan=true; else isDrag=true; lastMouse={{x:e.clientX, y:e.clientY}}; }});
         document.addEventListener('mousemove', (e) => {{
             if(isDrag && !hDrag) {{ customUniforms.uRotY.value += (e.clientX-lastMouse.x)*0.01; customUniforms.uRotX.value += (e.clientY-lastMouse.y)*0.01; lastMouse={{x:e.clientX, y:e.clientY}}; }}
@@ -720,6 +755,7 @@ three_js_code = f"""
         }});
         document.addEventListener('wheel', (e) => {{ if(!e.target.closest('#hud')) {{ curZoom+=e.deltaY*0.01; updCam(); }} }});
 
+        // Touch Input Support
         document.addEventListener('touchstart', (e) => {{
             if(e.target.closest('#hud')) return;
             if(e.touches.length===1) {{ isDrag=true; lastMouse={{x:e.touches[0].clientX, y:e.touches[0].clientY}}; }}
@@ -752,8 +788,5 @@ three_js_code = f"""
 </html>
 """
 
+# Render the assembled HTML block in the Streamlit app space
 components.html(three_js_code, height=900)
-
-# ========================================================
-# END OF FILE - MAKE SURE YOU HIGHLIGHT ALL THE WAY DOWN TO HERE!
-# ========================================================
